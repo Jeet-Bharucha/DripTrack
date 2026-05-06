@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DRIPTRACK — Create Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --black:#0a0a0a;--grey-900:#111;--grey-800:#1a1a1a;--grey-700:#252525;
+  --grey-600:#333;--grey-400:#666;--grey-200:#aaa;--white:#f0f0f0;
+  --accent:#e8ff00;--accent2:#ff3c3c;--up:#39ff14;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--black);color:var(--white);font-family:'Barlow Condensed',sans-serif;min-height:100vh;display:flex;overflow:hidden;cursor:none;}
+
+.cursor{position:fixed;width:10px;height:10px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;opacity:0;transition:transform 0.1s ease;mix-blend-mode:difference;}
+.cursor-ring{position:fixed;width:32px;height:32px;border:1px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;opacity:0;transition:all 0.15s ease;}
+
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;z-index:0;}
+
+/* LEFT PANEL */
+.left-panel{
+  width:45%;display:flex;align-items:center;justify-content:center;
+  padding:60px 56px;position:relative;z-index:1;order:1;
+}
+
+/* RIGHT INFO PANEL */
+.right-panel{
+  width:55%;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,#0d0d0a 0%,#121208 50%,#0d0d0a 100%);
+  border-left:1px solid var(--grey-700);
+  display:flex;flex-direction:column;justify-content:space-between;padding:60px;order:2;
+}
+.right-panel::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 70% 50% at 70% 50%,rgba(232,255,0,0.05) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+.brand{position:relative;z-index:2;}
+.brand-logo{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:6px;color:var(--accent);text-shadow:0 0 30px rgba(232,255,0,0.3);text-decoration:none;display:block;}
+.brand-logo span{color:var(--white);}
+.brand-tag{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--grey-400);margin-top:6px;text-transform:uppercase;}
+
+.perks{position:relative;z-index:2;}
+.perks-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:4px;color:var(--grey-400);text-transform:uppercase;margin-bottom:28px;}
+.perk-item{display:flex;align-items:flex-start;gap:16px;margin-bottom:28px;}
+.perk-icon{width:40px;height:40px;background:rgba(232,255,0,0.08);border:1px solid rgba(232,255,0,0.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.perk-text{}
+.perk-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:var(--white);margin-bottom:3px;}
+.perk-desc{font-family:'Barlow Condensed',sans-serif;font-size:14px;color:var(--grey-400);letter-spacing:0.5px;line-height:1.4;}
+
+.right-footer{position:relative;z-index:2;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-600);}
+
+/* FORM */
+.form-wrap{width:100%;max-width:400px;}
+.form-eyebrow{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:12px;}
+.form-eyebrow::before{content:'// ';}
+.form-title{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;line-height:1;margin-bottom:8px;}
+.form-sub{font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--grey-400);letter-spacing:1px;margin-bottom:32px;}
+.form-sub a{color:var(--accent);text-decoration:none;}
+
+.field{margin-bottom:18px;}
+.field-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--grey-200);text-transform:uppercase;margin-bottom:7px;display:block;}
+.field-wrap{position:relative;}
+.field-input{width:100%;background:var(--grey-900);border:1px solid var(--grey-700);color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;letter-spacing:1px;padding:13px 16px;outline:none;transition:border-color 0.2s;}
+.field-input:focus{border-color:var(--accent);}
+.field-input::placeholder{color:var(--grey-600);}
+.field-input.error{border-color:var(--accent2);}
+.field-input.success{border-color:var(--up);}
+.field-error{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent2);letter-spacing:1px;margin-top:5px;display:none;}
+.field-error.show{display:block;}
+.field-hint{font-family:'Space Mono',monospace;font-size:9px;color:var(--grey-400);letter-spacing:1px;margin-top:5px;}
+
+.password-toggle{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--grey-400);cursor:none;font-size:14px;transition:color 0.2s;padding:4px;}
+.password-toggle:hover{color:var(--accent);}
+
+/* PASSWORD STRENGTH */
+.strength-bar{display:flex;gap:4px;margin-top:8px;}
+.strength-seg{height:3px;flex:1;background:var(--grey-700);transition:background 0.3s;}
+.strength-seg.weak{background:var(--accent2);}
+.strength-seg.fair{background:#ff9900;}
+.strength-seg.good{background:var(--accent);}
+.strength-seg.strong{background:var(--up);}
+.strength-label{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:1px;color:var(--grey-400);margin-top:4px;}
+
+/* NAME ROW */
+.name-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+.terms-check{display:flex;align-items:flex-start;gap:12px;margin:20px 0;}
+.terms-check input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;margin-top:2px;cursor:none;}
+.terms-check label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-400);line-height:1.6;cursor:none;}
+.terms-check label a{color:var(--accent);text-decoration:none;}
+
+.submit-btn{width:100%;background:var(--accent);border:none;color:var(--black);font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;font-weight:700;text-transform:uppercase;padding:18px;cursor:none;transition:all 0.2s;position:relative;overflow:hidden;}
+.submit-btn::after{content:'';position:absolute;inset:0;background:var(--white);transform:translateX(-101%);transition:transform 0.25s ease;}
+.submit-btn:hover::after{transform:translateX(0);}
+.submit-btn span{position:relative;z-index:1;}
+.submit-btn:disabled{background:var(--grey-700);color:var(--grey-400);}
+.submit-btn:disabled::after{display:none;}
+
+.form-error{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent2);letter-spacing:1px;padding:10px;background:rgba(255,60,60,0.08);border:1px solid rgba(255,60,60,0.2);margin-top:12px;display:none;}
+.form-error.show{display:block;}
+
+/* SUCCESS */
+.success-msg{display:none;text-align:center;padding:40px 0;animation:fadeUp 0.5s ease;}
+.success-msg.show{display:block;}
+.success-icon{font-size:48px;margin-bottom:16px;}
+.success-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;color:var(--up);margin-bottom:8px;}
+.success-desc{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--grey-400);line-height:1.8;}
+.success-email-note{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);margin-top:16px;padding:12px;background:rgba(232,255,0,0.05);border:1px solid rgba(232,255,0,0.15);}
+
+.form-footer{margin-top:24px;text-align:center;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-600);}
+.form-footer a{color:var(--grey-400);text-decoration:none;transition:color 0.2s;}
+.form-footer a:hover{color:var(--accent);}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- LEFT — FORM -->
+<div class="left-panel">
+  <div class="form-wrap">
+
+    <div id="registerForm">
+      <p class="form-eyebrow">Join DripTrack</p>
+      <h2 class="form-title">CREATE<br>ACCOUNT</h2>
+      <p class="form-sub">Already have one? <a href="login.html">Sign in →</a></p>
+
+      <div class="name-row">
+        <div class="field">
+          <label class="field-label" for="firstName">First Name</label>
+          <input type="text" id="firstName" class="field-input" placeholder="John"/>
+          <div class="field-error" id="firstNameError">Required</div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="lastName">Last Name</label>
+          <input type="text" id="lastName" class="field-input" placeholder="Doe"/>
+          <div class="field-error" id="lastNameError">Required</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="email">Email Address</label>
+        <input type="email" id="email" class="field-input" placeholder="you@example.com" autocomplete="email"/>
+        <div class="field-error" id="emailError">Please enter a valid email address</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="password">Password</label>
+        <div class="field-wrap">
+          <input type="password" id="password" class="field-input" placeholder="Create a strong password" oninput="checkStrength(this.value)" autocomplete="new-password"/>
+          <button class="password-toggle" onclick="togglePassword('password',this)" type="button">👁</button>
+        </div>
+        <div class="strength-bar">
+          <div class="strength-seg" id="s1"></div>
+          <div class="strength-seg" id="s2"></div>
+          <div class="strength-seg" id="s3"></div>
+          <div class="strength-seg" id="s4"></div>
+        </div>
+        <div class="strength-label" id="strengthLabel">Enter a password</div>
+        <div class="field-error" id="passwordError">Password must be at least 8 characters</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="confirmPassword">Confirm Password</label>
+        <div class="field-wrap">
+          <input type="password" id="confirmPassword" class="field-input" placeholder="Repeat your password" autocomplete="new-password"/>
+          <button class="password-toggle" onclick="togglePassword('confirmPassword',this)" type="button">👁</button>
+        </div>
+        <div class="field-error" id="confirmError">Passwords do not match</div>
+      </div>
+
+      <div class="terms-check">
+        <input type="checkbox" id="terms"/>
+        <label for="terms">
+          I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+          I understand DripTrack tracks real-time prices for informational purposes.
+        </label>
+      </div>
+
+      <button class="submit-btn" id="registerBtn" onclick="handleRegister()">
+        <span id="registerBtnText">Create Account →</span>
+      </button>
+
+      <div class="form-error" id="formError"></div>
+    </div>
+
+    <!-- SUCCESS STATE -->
+    <div class="success-msg" id="successMsg">
+      <div class="success-icon">✅</div>
+      <div class="success-title">YOU'RE IN!</div>
+      <div class="success-desc">Your account has been created.<br>Welcome to DRIPTRACK.</div>
+      <div class="success-email-note" id="successEmailNote"></div>
+      <div style="margin-top:24px">
+        <a href="login.html" style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 28px;background:var(--accent);color:var(--black);text-decoration:none;font-weight:700;display:inline-block">
+          Sign In Now →
+        </a>
+      </div>
+    </div>
+
+    <div class="form-footer">
+      <a href="index.html">← Back to DRIPTRACK</a>
+      &nbsp;·&nbsp;
+      <a href="#">Privacy</a>
+      &nbsp;·&nbsp;
+      <a href="#">Terms</a>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT — PERKS -->
+<div class="right-panel">
+  <div class="brand">
+    <a href="index.html" class="brand-logo">DRIP<span>TRACK</span></a>
+    <div class="brand-tag">Real Prices. Real Products. Real Time.</div>
+  </div>
+
+  <div class="perks">
+    <div class="perks-title">// What you get</div>
+    <div class="perk-item">
+      <div class="perk-icon">🔔</div>
+      <div class="perk-text">
+        <div class="perk-name">Price Drop Alerts</div>
+        <div class="perk-desc">Get notified instantly when any product you're tracking drops in price across any platform.</div>
+      </div>
+    </div>
+    <div class="perk-item">
+      <div class="perk-icon">📊</div>
+      <div class="perk-text">
+        <div class="perk-name">Price History Charts</div>
+        <div class="perk-desc">See full price history across all retailers. Know the best time to buy.</div>
+      </div>
+    </div>
+    <div class="perk-item">
+      <div class="perk-icon">❤️</div>
+      <div class="perk-text">
+        <div class="perk-name">Watchlist</div>
+        <div class="perk-desc">Save products to your personal watchlist and track them across all sources simultaneously.</div>
+      </div>
+    </div>
+    <div class="perk-item">
+      <div class="perk-icon">✓</div>
+      <div class="perk-text">
+        <div class="perk-name">Authenticity Verified</div>
+        <div class="perk-desc">Every listing verified. Zero fakes, zero replicas. Only authentic products from trusted sellers.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-footer">Free forever · No credit card required · Cancel anytime</div>
+</div>
+
+<script>
+// CURSOR
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+document.addEventListener('mousemove', e => {
+  cursor.style.opacity='1'; ring.style.opacity='0.5';
+  cursor.style.left=e.clientX-5+'px'; cursor.style.top=e.clientY-5+'px';
+  ring.style.left=e.clientX-16+'px'; ring.style.top=e.clientY-16+'px';
+});
+document.addEventListener('mouseleave',()=>{cursor.style.opacity='0';ring.style.opacity='0';});
+document.querySelectorAll('button,a,input').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{cursor.style.transform='scale(2.5)';ring.style.transform='scale(1.5)';});
+  el.addEventListener('mouseleave',()=>{cursor.style.transform='scale(1)';ring.style.transform='scale(1)';});
+});
+
+// PASSWORD TOGGLE
+function togglePassword(id, btn) {
+  const input = document.getElementById(id);
+  if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
+  else { input.type = 'password'; btn.textContent = '👁'; }
+}
+
+// PASSWORD STRENGTH
+function checkStrength(val) {
+  const segs = ['s1','s2','s3','s4'];
+  const label = document.getElementById('strengthLabel');
+  segs.forEach(s => { const el=document.getElementById(s); el.className='strength-seg'; });
+
+  if (!val) { label.textContent='Enter a password'; return; }
+
+  let score = 0;
+  if (val.length >= 8) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+
+  const classes = ['weak','fair','good','strong'];
+  const labels = ['Weak','Fair','Good','Strong 💪'];
+  for (let i = 0; i < score; i++) {
+    document.getElementById(segs[i]).classList.add(classes[score-1]);
+  }
+  label.textContent = labels[score-1] || 'Weak';
+}
+
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// REGISTER HANDLER
+async function handleRegister() {
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName = document.getElementById('lastName').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const confirmPassword = document.getElementById('confirmPassword').value;
+  const terms = document.getElementById('terms').checked;
+  const btn = document.getElementById('registerBtn');
+  const btnText = document.getElementById('registerBtnText');
+  const formError = document.getElementById('formError');
+
+  // Clear all errors
+  ['firstName','lastName','email','password','confirm'].forEach(f => {
+    const err = document.getElementById(f+'Error') || document.getElementById('confirmError');
+    if (err) err.classList.remove('show');
+  });
+  document.getElementById('firstNameError').classList.remove('show');
+  document.getElementById('lastNameError').classList.remove('show');
+  document.getElementById('emailError').classList.remove('show');
+  document.getElementById('passwordError').classList.remove('show');
+  document.getElementById('confirmError').classList.remove('show');
+  formError.classList.remove('show');
+
+  ['firstName','lastName','email','password','confirmPassword'].forEach(id => {
+    document.getElementById(id).classList.remove('error','success');
+  });
+
+  // Validate
+  let valid = true;
+  if (!firstName) { document.getElementById('firstNameError').classList.add('show'); document.getElementById('firstName').classList.add('error'); valid=false; }
+  if (!lastName) { document.getElementById('lastNameError').classList.add('show'); document.getElementById('lastName').classList.add('error'); valid=false; }
+  if (!validateEmail(email)) { document.getElementById('emailError').classList.add('show'); document.getElementById('email').classList.add('error'); valid=false; }
+  if (password.length < 8) { document.getElementById('passwordError').classList.add('show'); document.getElementById('password').classList.add('error'); valid=false; }
+  if (password !== confirmPassword) { document.getElementById('confirmError').classList.add('show'); document.getElementById('confirmPassword').classList.add('error'); valid=false; }
+  if (!terms) { formError.textContent='Please agree to the Terms of Service to continue.'; formError.classList.add('show'); valid=false; }
+  if (!valid) return;
+
+  // Loading
+  btn.disabled = true;
+  btnText.textContent = 'Creating account...';
+
+  try {
+    const res = await fetch('http://localhost:3000/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName, lastName, email, password }),
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      document.getElementById('registerForm').style.display = 'none';
+      document.getElementById('successEmailNote').textContent =
+        `📧 A verification email has been sent to ${email}`;
+      document.getElementById('successMsg').classList.add('show');
+    } else {
+      formError.textContent = data.message || 'Registration failed — please try again';
+      formError.classList.add('show');
+      btn.disabled = false;
+      btnText.textContent = 'Create Account →';
+    }
+  } catch {
+    formError.textContent = '⚠️ Cannot connect to server — make sure your backend is running';
+    formError.classList.add('show');
+    btn.disabled = false;
+    btnText.textContent = 'Create Account →';
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleRegister();
+});
+</script>
+</body>
+</html>

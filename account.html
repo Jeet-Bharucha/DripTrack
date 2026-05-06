@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DRIPTRACK — My Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root[data-theme="dark"]{
+  --bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;--bg4:#252525;
+  --border:#252525;--border2:#333;
+  --text:#f0f0f0;--text2:#aaa;--text3:#666;
+  --accent:#e8ff00;--accent2:#ff3c3c;--up:#39ff14;--down:#ff3c3c;
+  --card-bg:#111;--nav-bg:rgba(10,10,10,0.92);
+}
+:root[data-theme="light"]{
+  --bg:#f5f5f0;--bg2:#ffffff;--bg3:#f0f0ea;--bg4:#e8e8e0;
+  --border:#e0e0d8;--border2:#d0d0c8;
+  --text:#111111;--text2:#444;--text3:#888;
+  --accent:#b8cc00;--accent2:#ff3c3c;--up:#1a8a00;--down:#cc2200;
+  --card-bg:#ffffff;--nav-bg:rgba(245,245,240,0.95);
+}
+*{margin:0;padding:0;box-sizing:border-box;transition:background 0.3s,color 0.2s,border-color 0.2s;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow Condensed',sans-serif;min-height:100vh;cursor:none;}
+.cursor{position:fixed;width:10px;height:10px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;opacity:0;mix-blend-mode:difference;}
+.cursor-ring{position:fixed;width:32px;height:32px;border:1px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;opacity:0;transition:all 0.15s ease;}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:center;justify-content:space-between;padding:16px 48px;background:var(--nav-bg);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);}
+.nav-logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--accent);text-decoration:none;}
+.nav-logo span{color:var(--text);}
+.nav-right{display:flex;align-items:center;gap:20px;}
+.nav-link{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);text-decoration:none;transition:color 0.2s;}
+.nav-link:hover{color:var(--accent);}
+.theme-toggle{background:var(--bg3);border:1px solid var(--border2);width:52px;height:26px;border-radius:13px;cursor:none;position:relative;transition:all 0.3s;}
+.theme-toggle-knob{position:absolute;top:3px;left:3px;width:18px;height:18px;background:var(--accent);border-radius:50%;transition:transform 0.3s;}
+[data-theme="light"] .theme-toggle-knob{transform:translateX(26px);}
+.theme-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;}
+
+/* LAYOUT */
+.page{padding:100px 48px 60px;max-width:1200px;margin:0 auto;}
+.page-header{margin-bottom:48px;}
+.page-eyebrow{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
+.page-eyebrow::before{content:'// ';}
+.page-title{font-family:'Bebas Neue',sans-serif;font-size:56px;letter-spacing:3px;line-height:1;}
+.page-sub{font-family:'Barlow Condensed',sans-serif;font-size:16px;color:var(--text2);margin-top:8px;letter-spacing:1px;}
+
+/* TABS */
+.tabs{display:flex;gap:2px;margin-bottom:40px;border-bottom:1px solid var(--border);}
+.tab{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:12px 24px;background:transparent;border:none;color:var(--text3);cursor:none;transition:all 0.2s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* TAB CONTENT */
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* CARDS */
+.card{background:var(--card-bg);border:1px solid var(--border);padding:32px;margin-bottom:20px;}
+.card-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;margin-bottom:20px;color:var(--accent);}
+
+/* PROFILE FORM */
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.field{margin-bottom:0;}
+.field-full{grid-column:1/-1;}
+.field-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--text2);text-transform:uppercase;margin-bottom:8px;display:block;}
+.field-input{width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:600;letter-spacing:1px;padding:12px 16px;outline:none;transition:border-color 0.2s;}
+.field-input:focus{border-color:var(--accent);}
+.field-input:disabled{opacity:0.5;cursor:not-allowed;}
+.save-btn{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;background:var(--accent);color:#000;border:none;padding:14px 28px;cursor:none;font-weight:700;margin-top:20px;transition:all 0.2s;}
+.save-btn:hover{opacity:0.85;}
+.danger-btn{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;background:transparent;color:var(--accent2);border:1px solid var(--accent2);padding:14px 28px;cursor:none;font-weight:700;margin-top:20px;transition:all 0.2s;}
+.danger-btn:hover{background:var(--accent2);color:#fff;}
+.success-toast{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--up);padding:10px 16px;background:rgba(57,255,20,0.08);border:1px solid rgba(57,255,20,0.2);margin-top:12px;display:none;}
+.success-toast.show{display:block;}
+
+/* WATCHLIST */
+.watchlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+.watchlist-card{background:var(--bg3);border:1px solid var(--border);padding:20px;position:relative;transition:border-color 0.2s;}
+.watchlist-card:hover{border-color:var(--accent);}
+.wl-source{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:6px;}
+.wl-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:8px;line-height:1.1;}
+.wl-price{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:var(--up);margin-bottom:12px;}
+.wl-actions{display:flex;gap:8px;}
+.wl-btn{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:none;transition:all 0.2s;}
+.wl-btn:hover{border-color:var(--accent);color:var(--accent);}
+.wl-remove{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text3);cursor:none;font-size:16px;transition:color 0.2s;}
+.wl-remove:hover{color:var(--accent2);}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text3);}
+.empty-icon{font-size:48px;margin-bottom:16px;}
+.empty-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;margin-bottom:8px;color:var(--text2);}
+.empty-desc{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;line-height:1.8;}
+.empty-cta{display:inline-block;margin-top:20px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:12px 24px;background:var(--accent);color:#000;text-decoration:none;font-weight:700;}
+
+/* PRICE ALERTS */
+.alert-row{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border);}
+.alert-info{}
+.alert-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;}
+.alert-target{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--text2);margin-top:3px;}
+.alert-toggle{width:44px;height:22px;background:var(--bg4);border:1px solid var(--border2);border-radius:11px;cursor:none;position:relative;transition:all 0.3s;}
+.alert-toggle.on{background:var(--accent);border-color:var(--accent);}
+.alert-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform 0.3s;}
+.alert-toggle.on .alert-knob{transform:translateX(22px);}
+
+/* LOGIN HISTORY */
+.history-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border);}
+.history-info{}
+.history-device{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;letter-spacing:1px;}
+.history-time{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--text3);margin-top:3px;}
+.history-badge{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;}
+.badge-current{background:rgba(57,255,20,0.1);color:var(--up);border:1px solid rgba(57,255,20,0.2);}
+.badge-past{background:var(--bg3);color:var(--text3);border:1px solid var(--border);}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:32px;}
+.stat-card{background:var(--bg3);border:1px solid var(--border);padding:24px;text-align:center;}
+.stat-num{font-family:'Bebas Neue',sans-serif;font-size:38px;color:var(--accent);letter-spacing:2px;line-height:1;}
+.stat-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text3);margin-top:4px;text-transform:uppercase;}
+
+/* NOT LOGGED IN */
+.auth-wall{text-align:center;padding:120px 40px;max-width:500px;margin:0 auto;}
+.auth-wall-icon{font-size:56px;margin-bottom:24px;}
+.auth-wall-title{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:3px;margin-bottom:12px;}
+.auth-wall-desc{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--text2);line-height:1.8;margin-bottom:32px;}
+.auth-wall-btns{display:flex;gap:12px;justify-content:center;}
+.auth-btn-primary{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 28px;background:var(--accent);color:#000;text-decoration:none;font-weight:700;}
+.auth-btn-secondary{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 28px;background:transparent;color:var(--text);border:1px solid var(--border2);text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav>
+  <a href="index.html" class="nav-logo">DRIP<span>TRACK</span></a>
+  <div class="nav-right">
+    <a href="index.html" class="nav-link">← Back</a>
+    <span class="theme-label" id="themeLabel">Dark</span>
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
+      <div class="theme-toggle-knob"></div>
+    </div>
+    <a href="#" class="nav-link" onclick="logout(event)" id="logoutBtn">Sign Out</a>
+  </div>
+</nav>
+
+<div class="page" id="mainContent" style="display:none">
+  <div class="page-header">
+    <p class="page-eyebrow">My Account</p>
+    <h1 class="page-title" id="welcomeName">WELCOME BACK</h1>
+    <p class="page-sub" id="welcomeEmail">Loading your account...</p>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-num" id="statWatchlist">0</div><div class="stat-label">Watchlist Items</div></div>
+    <div class="stat-card"><div class="stat-num" id="statAlerts">0</div><div class="stat-label">Price Alerts</div></div>
+    <div class="stat-card"><div class="stat-num" id="statLogins">0</div><div class="stat-label">Total Logins</div></div>
+    <div class="stat-card"><div class="stat-num" id="statDays">0</div><div class="stat-label">Days Active</div></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('watchlist',this)">❤️ Watchlist</button>
+    <button class="tab" onclick="showTab('profile',this)">👤 Profile</button>
+    <button class="tab" onclick="showTab('alerts',this)">🔔 Price Alerts</button>
+    <button class="tab" onclick="showTab('history',this)">🕐 Login History</button>
+  </div>
+
+  <!-- WATCHLIST TAB -->
+  <div class="tab-content active" id="tab-watchlist">
+    <div id="watchlistContent"></div>
+  </div>
+
+  <!-- PROFILE TAB -->
+  <div class="tab-content" id="tab-profile">
+    <div class="card">
+      <div class="card-title">Profile Picture</div>
+      <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+        <div style="position:relative;cursor:pointer" onclick="document.getElementById('avatarInput').click()">
+          <div id="avatarPreview" style="width:90px;height:90px;border-radius:50%;background:var(--bg4);
+               border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;
+               overflow:hidden;font-size:36px;transition:all 0.2s"
+               onmouseover="document.getElementById('avatarOverlay').style.opacity='1'"
+               onmouseout="document.getElementById('avatarOverlay').style.opacity='0'">
+            <span id="avatarEmoji">👤</span>
+          </div>
+          <div id="avatarOverlay" style="position:absolute;inset:0;border-radius:50%;
+               background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;
+               opacity:0;transition:opacity 0.2s;font-family:'Space Mono',monospace;
+               font-size:9px;letter-spacing:1px;color:var(--accent);text-align:center">
+            CHANGE
+          </div>
+        </div>
+        <div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;margin-bottom:8px" id="avatarName">Your Name</div>
+          <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="handleAvatarUpload(event)"/>
+          <button class="save-btn" style="margin-top:0;padding:10px 20px;font-size:10px"
+            onclick="document.getElementById('avatarInput').click()">Upload Photo →</button>
+          <button onclick="removeAvatar()"
+            style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;
+                   text-transform:uppercase;background:transparent;color:var(--text3);border:none;
+                   cursor:pointer;margin-left:12px;transition:color 0.2s"
+            onmouseover="this.style.color='var(--accent2)'" onmouseout="this.style.color='var(--text3)'">
+            Remove
+          </button>
+        </div>
+      </div>
+      <div class="success-toast" id="avatarToast" style="margin-top:12px">✓ Profile picture updated</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Personal Information</div>
+      <div class="profile-grid">
+        <div class="field">
+          <label class="field-label">First Name</label>
+          <input type="text" class="field-input" id="profileFirstName"/>
+        </div>
+        <div class="field">
+          <label class="field-label">Last Name</label>
+          <input type="text" class="field-input" id="profileLastName"/>
+        </div>
+        <div class="field field-full">
+          <label class="field-label">Email Address</label>
+          <input type="email" class="field-input" id="profileEmail" disabled/>
+        </div>
+      </div>
+      <button class="save-btn" onclick="saveProfile()">Save Changes →</button>
+      <div class="success-toast" id="profileToast">✓ Profile updated successfully</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Change Password</div>
+      <div class="profile-grid">
+        <div class="field field-full">
+          <label class="field-label">Current Password</label>
+          <input type="password" class="field-input" id="currentPassword" placeholder="Enter current password"/>
+        </div>
+        <div class="field">
+          <label class="field-label">New Password</label>
+          <input type="password" class="field-input" id="newPassword" placeholder="Min 8 characters"/>
+        </div>
+        <div class="field">
+          <label class="field-label">Confirm New Password</label>
+          <input type="password" class="field-input" id="confirmNewPassword" placeholder="Repeat new password"/>
+        </div>
+      </div>
+      <button class="save-btn" onclick="changePassword()">Update Password →</button>
+      <div class="success-toast" id="passwordToast">✓ Password changed successfully</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="color:var(--accent2)">Danger Zone</div>
+      <p style="font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--text2);margin-bottom:16px;letter-spacing:0.5px">
+        Deleting your account is permanent and cannot be undone. All your watchlist and alert data will be lost.
+      </p>
+      <button class="danger-btn" onclick="deleteAccount()">Delete My Account</button>
+    </div>
+  </div>
+
+  <!-- ALERTS TAB -->
+  <div class="tab-content" id="tab-alerts">
+    <div class="card">
+      <div class="card-title">Price Alert Settings</div>
+      <p style="font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--text2);margin-bottom:24px;letter-spacing:0.5px">
+        Get notified when a product in your watchlist drops below your target price.
+      </p>
+      <div id="alertsContent"></div>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div class="tab-content" id="tab-history">
+    <div class="card">
+      <div class="card-title">Login History</div>
+      <div id="historyContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- NOT LOGGED IN -->
+<div class="auth-wall" id="authWall" style="display:none">
+  <div class="auth-wall-icon">🔐</div>
+  <h2 class="auth-wall-title">SIGN IN REQUIRED</h2>
+  <p class="auth-wall-desc">You need to be signed in to view your account. Create a free account to track products, set price alerts and more.</p>
+  <div class="auth-wall-btns">
+    <a href="login.html" class="auth-btn-primary">Sign In →</a>
+    <a href="register.html" class="auth-btn-secondary">Create Account</a>
+  </div>
+</div>
+
+<script>
+// ── CURSOR
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+document.addEventListener('mousemove', e => {
+  cursor.style.opacity='1'; ring.style.opacity='0.5';
+  cursor.style.left=e.clientX-5+'px'; cursor.style.top=e.clientY-5+'px';
+  ring.style.left=e.clientX-16+'px'; ring.style.top=e.clientY-16+'px';
+});
+document.addEventListener('mouseleave',()=>{cursor.style.opacity='0';ring.style.opacity='0';});
+
+// ── THEME
+const savedTheme = localStorage.getItem('driptrack_theme') || 'dark';
+document.documentElement.setAttribute('data-theme', savedTheme);
+document.getElementById('themeLabel').textContent = savedTheme === 'dark' ? 'Dark' : 'Light';
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('driptrack_theme', next);
+  document.getElementById('themeLabel').textContent = next === 'dark' ? 'Dark' : 'Light';
+}
+
+// ── AUTH CHECK
+const token = localStorage.getItem('driptrack_token');
+const userStr = localStorage.getItem('driptrack_user');
+let currentUser = null;
+
+if (!token || !userStr) {
+  document.getElementById('authWall').style.display = 'block';
+} else {
+  currentUser = JSON.parse(userStr);
+  document.getElementById('mainContent').style.display = 'block';
+  loadAccount();
+}
+
+// ── LOAD ACCOUNT DATA
+async function loadAccount() {
+  // Set welcome header
+  document.getElementById('welcomeName').textContent = `WELCOME, ${currentUser.firstName.toUpperCase()}`;
+  document.getElementById('welcomeEmail').textContent = currentUser.email;
+
+  // Set profile fields
+  document.getElementById('profileFirstName').value = currentUser.firstName;
+  document.getElementById('profileLastName').value = currentUser.lastName;
+  document.getElementById('profileEmail').value = currentUser.email;
+
+  // Load watchlist
+  loadWatchlist();
+  loadAlerts();
+  loadHistory();
+  loadAvatar();
+
+  // Stats
+  const days = Math.floor((Date.now() - new Date(currentUser.createdAt || Date.now()).getTime()) / 86400000);
+  document.getElementById('statDays').textContent = Math.max(days, 1);
+  document.getElementById('statLogins').textContent = parseInt(localStorage.getItem('driptrack_logins') || '1');
+}
+
+// ── TABS
+function showTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── WATCHLIST
+function loadWatchlist() {
+  const watchlist = JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
+  document.getElementById('statWatchlist').textContent = watchlist.length;
+
+  // Count how many alerts are enabled
+  const alerts = JSON.parse(localStorage.getItem('driptrack_alerts') || '{}');
+  const enabledAlerts = watchlist.filter((_, i) => alerts[i] !== false).length;
+  document.getElementById('statAlerts').textContent = enabledAlerts;
+
+  const container = document.getElementById('watchlistContent');
+  if (watchlist.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">❤️</div>
+        <div class="empty-title">Your Watchlist is Empty</div>
+        <div class="empty-desc">Add products from the main page by clicking<br>the ❤️ button on any product card.</div>
+        <a href="index.html" class="empty-cta">Browse Products →</a>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `<div class="watchlist-grid">${watchlist.map((item, i) => `
+    <div class="watchlist-card">
+      <button class="wl-remove" onclick="removeFromWatchlist(${i})">✕</button>
+      <div class="wl-source">${item.source || 'Unknown'}</div>
+      <div class="wl-name">${(item.title || item.name || 'Product').slice(0, 40)}...</div>
+      <div class="wl-price">${item.price ? '$' + parseFloat(item.price).toFixed(2) : 'Price varies'}</div>
+      <div class="wl-actions">
+        ${item.url ? `<a href="${item.url}" target="_blank" class="wl-btn" style="text-decoration:none">Shop →</a>` : ''}
+        <button class="wl-btn" onclick="removeFromWatchlist(${i})">Remove</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function removeFromWatchlist(index) {
+  const watchlist = JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
+  watchlist.splice(index, 1);
+  localStorage.setItem('driptrack_watchlist', JSON.stringify(watchlist));
+  loadWatchlist();
+}
+
+// ── PRICE ALERTS
+function loadAlerts() {
+  const watchlist = JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
+  const alertsData = JSON.parse(localStorage.getItem('driptrack_alerts') || '{}');
+  const container = document.getElementById('alertsContent');
+
+  if (watchlist.length === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:20px 0">
+      <div class="empty-desc">Add products to your watchlist first to set price alerts.</div>
+      <a href="index.html" class="empty-cta" style="margin-top:12px">Browse Products →</a>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = watchlist.map((item, i) => {
+    const alertOn = alertsData[i] !== false;
+    const targetPrice = alertsData['target_' + i] || '';
+    const currentPrice = parseFloat(item.price || 0);
+    return `
+      <div class="alert-row" style="flex-wrap:wrap;gap:12px">
+        <div class="alert-info" style="flex:1;min-width:200px">
+          <div class="alert-name">${(item.title || item.name || 'Product').slice(0, 40)}...</div>
+          <div class="alert-target" style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span>Current: <strong style="color:var(--up)">$${currentPrice.toFixed(2)}</strong></span>
+            <span style="color:var(--text3)">·</span>
+            <span style="display:flex;align-items:center;gap:6px">
+              Alert below:
+              <input type="number" id="target-${i}" value="${targetPrice}"
+                placeholder="${(currentPrice * 0.9).toFixed(0)}"
+                style="width:80px;background:var(--bg3);border:1px solid var(--border2);
+                       color:var(--text);font-family:'Space Mono',monospace;font-size:11px;
+                       padding:4px 8px;outline:none"
+                onchange="saveTargetPrice(${i}, this.value)"
+                onfocus="this.style.borderColor='var(--accent)'"
+                onblur="this.style.borderColor='var(--border2)'"/>
+            </span>
+          </div>
+          <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--text3);margin-top:4px;letter-spacing:1px">
+            ${targetPrice ? `📧 Email when price drops below $${parseFloat(targetPrice).toFixed(2)}` : 'Enter a target price to get email alerts'}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="alert-toggle ${alertOn?'on':''}" onclick="toggleAlert(${i}, this)" title="Toggle alert">
+            <div class="alert-knob"></div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function saveTargetPrice(index, value) {
+  const alerts = JSON.parse(localStorage.getItem('driptrack_alerts') || '{}');
+  alerts['target_' + index] = value;
+  localStorage.setItem('driptrack_alerts', JSON.stringify(alerts));
+  // Update stat
+  const watchlist = JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
+  const enabled = watchlist.filter((_, i) => alerts[i] !== false).length;
+  document.getElementById('statAlerts').textContent = enabled;
+  // Re-render to update hint text
+  loadAlerts();
+}
+
+function toggleAlert(index, el) {
+  el.classList.toggle('on');
+  const alerts = JSON.parse(localStorage.getItem('driptrack_alerts') || '{}');
+  alerts[index] = el.classList.contains('on');
+  localStorage.setItem('driptrack_alerts', JSON.stringify(alerts));
+  // Update stat count
+  const watchlist = JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
+  const enabled = watchlist.filter((_, i) => alerts[i] !== false).length;
+  document.getElementById('statAlerts').textContent = enabled;
+  // Sync to server
+  syncAlertsToServer(watchlist, alerts);
+}
+
+function syncAlertsToServer(watchlist, alerts) {
+  const serverAlerts = {};
+  watchlist.forEach((item, i) => {
+    serverAlerts[i] = {
+      enabled: alerts[i] !== false,
+      targetPrice: parseFloat(alerts['target_' + i]) || null,
+      productName: item.title || item.name || '',
+    };
+  });
+  fetch('http://localhost:3000/auth/price-alerts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ alerts: serverAlerts }),
+  }).catch(() => {}); // silent fail — localStorage still works
+}
+
+// ── LOGIN HISTORY
+function loadHistory() {
+  const history = JSON.parse(localStorage.getItem('driptrack_login_history') || '[]');
+  const container = document.getElementById('historyContent');
+
+  if (history.length === 0) {
+    container.innerHTML = `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);padding:20px 0">No login history available yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = history.slice().reverse().map((h, i) => `
+    <div class="history-row">
+      <div class="history-info">
+        <div class="history-device">${h.device || 'Chrome on Windows'}</div>
+        <div class="history-time">${new Date(h.time).toLocaleString()}</div>
+      </div>
+      <span class="history-badge ${i === 0 ? 'badge-current' : 'badge-past'}">${i === 0 ? '● Current' : 'Past'}</span>
+    </div>`).join('');
+
+  document.getElementById('statLogins').textContent = history.length;
+}
+
+// ── AVATAR
+function loadAvatar() {
+  const avatar = localStorage.getItem('driptrack_avatar');
+  const preview = document.getElementById('avatarPreview');
+  const nameEl = document.getElementById('avatarName');
+  if (nameEl && currentUser) nameEl.textContent = currentUser.firstName + ' ' + currentUser.lastName;
+  if (!preview) return;
+  if (avatar) {
+    preview.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    const initials = ((currentUser?.firstName?.[0] || '') + (currentUser?.lastName?.[0] || '')).toUpperCase();
+    preview.innerHTML = `<span style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px">${initials || '👤'}</span>`;
+  }
+}
+
+function handleAvatarUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { alert('Image must be under 2MB'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    localStorage.setItem('driptrack_avatar', dataUrl);
+    loadAvatar();
+    document.getElementById('avatarToast').classList.add('show');
+    setTimeout(() => document.getElementById('avatarToast').classList.remove('show'), 3000);
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeAvatar() {
+  localStorage.removeItem('driptrack_avatar');
+  loadAvatar();
+}
+
+// ── SAVE PROFILE
+async function saveProfile() {
+  const firstName = document.getElementById('profileFirstName').value.trim();
+  const lastName = document.getElementById('profileLastName').value.trim();
+  if (!firstName || !lastName) return alert('Please fill in all fields');
+
+  try {
+    const res = await fetch('http://localhost:3000/auth/update-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ firstName, lastName }),
+    });
+    if (res.ok) {
+      currentUser.firstName = firstName;
+      currentUser.lastName = lastName;
+      localStorage.setItem('driptrack_user', JSON.stringify(currentUser));
+      document.getElementById('welcomeName').textContent = `WELCOME, ${firstName.toUpperCase()}`;
+      document.getElementById('profileToast').classList.add('show');
+      setTimeout(() => document.getElementById('profileToast').classList.remove('show'), 3000);
+    }
+  } catch {
+    // Update locally even if backend fails
+    currentUser.firstName = firstName;
+    currentUser.lastName = lastName;
+    localStorage.setItem('driptrack_user', JSON.stringify(currentUser));
+    document.getElementById('profileToast').classList.add('show');
+    setTimeout(() => document.getElementById('profileToast').classList.remove('show'), 3000);
+  }
+}
+
+// ── CHANGE PASSWORD
+async function changePassword() {
+  const current = document.getElementById('currentPassword').value;
+  const newPass = document.getElementById('newPassword').value;
+  const confirm = document.getElementById('confirmNewPassword').value;
+
+  if (!current || !newPass || !confirm) return alert('Please fill in all password fields');
+  if (newPass.length < 8) return alert('New password must be at least 8 characters');
+  if (newPass !== confirm) return alert('New passwords do not match');
+
+  try {
+    const res = await fetch('http://localhost:3000/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ currentPassword: current, newPassword: newPass }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      document.getElementById('passwordToast').classList.add('show');
+      setTimeout(() => document.getElementById('passwordToast').classList.remove('show'), 3000);
+      document.getElementById('currentPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmNewPassword').value = '';
+    } else {
+      alert(data.message || 'Failed to change password');
+    }
+  } catch {
+    alert('Cannot connect to server');
+  }
+}
+
+// ── DELETE ACCOUNT
+async function deleteAccount() {
+  if (confirm('Are you sure? This cannot be undone. All your data will be permanently deleted.')) {
+    if (confirm('Last chance — are you absolutely sure?')) {
+      try {
+        await fetch('http://localhost:3000/auth/account', {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+      } catch { /* proceed even if server is unreachable */ }
+      localStorage.removeItem('driptrack_token');
+      localStorage.removeItem('driptrack_user');
+      localStorage.removeItem('driptrack_watchlist');
+      localStorage.removeItem('driptrack_alerts');
+      localStorage.removeItem('driptrack_login_history');
+      window.location.href = 'register.html';
+    }
+  }
+}
+
+// ── LOGOUT
+function logout(e) {
+  e.preventDefault();
+  localStorage.removeItem('driptrack_token');
+  localStorage.removeItem('driptrack_user');
+  window.location.href = 'login.html';
+}
+
+// Cursor refresh
+document.querySelectorAll('button,a,input,.theme-toggle,.alert-toggle').forEach(el => {
+  el.addEventListener('mouseenter', () => { cursor.style.transform='scale(2)'; ring.style.transform='scale(1.5)'; });
+  el.addEventListener('mouseleave', () => { cursor.style.transform='scale(1)'; ring.style.transform='scale(1)'; });
+});
+</script>
+</body>
+</html>

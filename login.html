@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DRIPTRACK — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --black:#0a0a0a;--grey-900:#111;--grey-800:#1a1a1a;--grey-700:#252525;
+  --grey-600:#333;--grey-400:#666;--grey-200:#aaa;--white:#f0f0f0;
+  --accent:#e8ff00;--accent2:#ff3c3c;--up:#39ff14;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--black);color:var(--white);font-family:'Barlow Condensed',sans-serif;min-height:100vh;display:flex;overflow:hidden;cursor:none;}
+
+/* CURSOR */
+.cursor{position:fixed;width:10px;height:10px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;opacity:0;transition:transform 0.1s ease;mix-blend-mode:difference;}
+.cursor-ring{position:fixed;width:32px;height:32px;border:1px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;opacity:0;transition:all 0.15s ease;}
+
+/* GRID BG */
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;z-index:0;}
+
+/* LEFT PANEL */
+.left-panel{
+  width:55%;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,#0a0a0a 0%,#111 50%,#0a0a0a 100%);
+  border-right:1px solid var(--grey-700);
+  display:flex;flex-direction:column;justify-content:space-between;padding:60px;
+}
+.left-panel::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 30% 50%,rgba(232,255,0,0.04) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+.brand{position:relative;z-index:2;}
+.brand-logo{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:6px;color:var(--accent);text-shadow:0 0 30px rgba(232,255,0,0.3);text-decoration:none;display:block;}
+.brand-logo span{color:var(--white);}
+.brand-tag{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--grey-400);margin-top:6px;text-transform:uppercase;}
+
+.left-content{position:relative;z-index:2;}
+.left-headline{font-family:'Bebas Neue',sans-serif;font-size:clamp(52px,6vw,88px);line-height:0.9;letter-spacing:2px;margin-bottom:24px;}
+.left-headline .outline{color:transparent;-webkit-text-stroke:1px rgba(240,240,240,0.2);}
+.left-headline .accent{color:var(--accent);}
+.left-desc{font-family:'Barlow Condensed',sans-serif;font-size:17px;color:var(--grey-200);letter-spacing:1px;line-height:1.6;max-width:380px;margin-bottom:40px;}
+
+.stats-row{display:flex;gap:40px;}
+.stat-item{}
+.stat-num{font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--accent);letter-spacing:2px;line-height:1;}
+.stat-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400);margin-top:3px;text-transform:uppercase;}
+
+/* TICKER */
+.ticker-wrap{overflow:hidden;border-top:1px solid var(--grey-700);padding-top:20px;position:relative;z-index:2;}
+.ticker-inner{display:flex;gap:0;animation:tick 20s linear infinite;white-space:nowrap;}
+.tick-item{display:inline-flex;align-items:center;gap:8px;padding:0 24px;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;border-right:1px solid var(--grey-700);}
+.tick-item .n{color:var(--grey-200);}
+.tick-item .p{color:var(--white);font-weight:700;}
+.tick-item .up{color:var(--up);}
+.tick-item .dn{color:var(--accent2);}
+@keyframes tick{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+
+/* RIGHT PANEL — LOGIN FORM */
+.right-panel{
+  width:45%;display:flex;align-items:center;justify-content:center;
+  padding:60px 56px;position:relative;z-index:1;
+}
+
+.form-wrap{width:100%;max-width:380px;}
+
+.form-eyebrow{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:12px;}
+.form-eyebrow::before{content:'// ';opacity:0.5;}
+.form-title{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;line-height:1;margin-bottom:8px;}
+.form-sub{font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--grey-400);letter-spacing:1px;margin-bottom:40px;}
+.form-sub a{color:var(--accent);text-decoration:none;}
+.form-sub a:hover{text-decoration:underline;}
+
+.field{margin-bottom:20px;}
+.field-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--grey-200);text-transform:uppercase;margin-bottom:8px;display:block;}
+.field-wrap{position:relative;}
+.field-input{
+  width:100%;background:var(--grey-900);border:1px solid var(--grey-700);
+  color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:18px;
+  font-weight:600;letter-spacing:1px;padding:14px 16px;outline:none;
+  transition:border-color 0.2s;
+}
+.field-input:focus{border-color:var(--accent);}
+.field-input::placeholder{color:var(--grey-600);}
+.field-input.error{border-color:var(--accent2);}
+
+.password-toggle{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--grey-400);cursor:none;font-size:14px;transition:color 0.2s;padding:4px;}
+.password-toggle:hover{color:var(--accent);}
+
+.field-error{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent2);letter-spacing:1px;margin-top:6px;display:none;}
+.field-error.show{display:block;}
+
+.forgot{display:block;text-align:right;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-400);text-decoration:none;margin-top:8px;transition:color 0.2s;}
+.forgot:hover{color:var(--accent);}
+
+.submit-btn{
+  width:100%;background:var(--accent);border:none;color:var(--black);
+  font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;
+  font-weight:700;text-transform:uppercase;padding:18px;cursor:none;
+  margin-top:32px;transition:all 0.2s;position:relative;overflow:hidden;
+}
+.submit-btn::after{content:'';position:absolute;inset:0;background:var(--white);transform:translateX(-101%);transition:transform 0.25s ease;}
+.submit-btn:hover::after{transform:translateX(0);}
+.submit-btn span{position:relative;z-index:1;}
+.submit-btn:disabled{background:var(--grey-700);color:var(--grey-400);cursor:not-allowed;}
+.submit-btn:disabled::after{display:none;}
+
+.divider{display:flex;align-items:center;gap:16px;margin:28px 0;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--grey-700);}
+.divider span{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-600);text-transform:uppercase;}
+
+.social-row{display:flex;gap:12px;}
+.social-btn{
+  flex:1;background:var(--grey-900);border:1px solid var(--grey-700);
+  color:var(--white);font-family:'Space Mono',monospace;font-size:10px;
+  letter-spacing:1px;text-transform:uppercase;padding:13px;cursor:none;
+  transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.social-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+.form-footer{margin-top:32px;text-align:center;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-600);}
+.form-footer a{color:var(--grey-400);text-decoration:none;transition:color 0.2s;}
+.form-footer a:hover{color:var(--accent);}
+
+/* SUCCESS STATE */
+.success-msg{
+  display:none;text-align:center;padding:40px 0;
+  animation:fadeUp 0.5s ease;
+}
+.success-msg.show{display:block;}
+.success-icon{font-size:48px;margin-bottom:16px;}
+.success-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;color:var(--up);margin-bottom:8px;}
+.success-desc{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--grey-400);}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- LEFT PANEL -->
+<div class="left-panel">
+  <div class="brand">
+    <a href="index.html" class="brand-logo">DRIP<span>TRACK</span></a>
+    <div class="brand-tag">Real Prices. Real Products. Real Time.</div>
+  </div>
+
+  <div class="left-content">
+    <h1 class="left-headline">
+      TRACK<br>
+      <span class="outline">EVERY</span><br>
+      <span class="accent">PRICE</span>
+    </h1>
+    <p class="left-desc">Sign in to track your favorite sneakers, watches, bags and streetwear across every major retailer — in real time.</p>
+    <div class="stats-row">
+      <div class="stat-item"><div class="stat-num">50K+</div><div class="stat-label">Products</div></div>
+      <div class="stat-item"><div class="stat-num">12</div><div class="stat-label">Sources</div></div>
+      <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">Authentic</div></div>
+    </div>
+  </div>
+
+  <div class="ticker-wrap">
+    <div class="ticker-inner" id="ticker"></div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="right-panel">
+  <div class="form-wrap">
+
+    <div id="loginForm">
+      <p class="form-eyebrow">Welcome Back</p>
+      <h2 class="form-title">SIGN IN</h2>
+      <p class="form-sub">No account? <a href="register.html">Create one free →</a></p>
+
+      <div class="field">
+        <label class="field-label" for="email">Email Address</label>
+        <div class="field-wrap">
+          <input type="email" id="email" class="field-input" placeholder="you@example.com" autocomplete="email"/>
+        </div>
+        <div class="field-error" id="emailError">Please enter a valid email address</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="password">Password</label>
+        <div class="field-wrap">
+          <input type="password" id="password" class="field-input" placeholder="Enter your password" autocomplete="current-password"/>
+          <button class="password-toggle" onclick="togglePassword('password', this)" type="button">👁</button>
+        </div>
+        <a href="#" class="forgot" onclick="forgotPassword(event)">Forgot password?</a>
+        <div class="field-error" id="passwordError">Password must be at least 8 characters</div>
+      </div>
+
+      <div class="field-error" id="loginError" style="margin-top:8px;font-size:10px;padding:10px;background:rgba(255,60,60,0.08);border:1px solid rgba(255,60,60,0.2)"></div>
+
+      <button class="submit-btn" id="loginBtn" onclick="handleLogin()">
+        <span id="loginBtnText">Sign In →</span>
+      </button>
+
+      <div class="divider"><span>or continue with</span></div>
+
+      <div class="social-row">
+        <button class="social-btn" onclick="socialLogin('Google')">
+          <span>G</span> Google
+        </button>
+        <button class="social-btn" onclick="socialLogin('Apple')">
+          <span>⌘</span> Apple
+        </button>
+      </div>
+    </div>
+
+    <div class="success-msg" id="successMsg">
+      <div class="success-icon">✓</div>
+      <div class="success-title">WELCOME BACK</div>
+      <div class="success-desc" style="margin-bottom:24px">Redirecting to your dashboard...</div>
+    </div>
+
+    <div class="form-footer">
+      <a href="index.html">← Back to DRIPTRACK</a>
+      &nbsp;·&nbsp;
+      <a href="#">Privacy Policy</a>
+      &nbsp;·&nbsp;
+      <a href="#">Terms</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// CURSOR
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+document.addEventListener('mousemove', e => {
+  cursor.style.opacity='1'; ring.style.opacity='0.5';
+  cursor.style.left=e.clientX-5+'px'; cursor.style.top=e.clientY-5+'px';
+  ring.style.left=e.clientX-16+'px'; ring.style.top=e.clientY-16+'px';
+});
+document.addEventListener('mouseleave',()=>{cursor.style.opacity='0';ring.style.opacity='0';});
+document.querySelectorAll('button,a,input').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{cursor.style.transform='scale(2.5)';ring.style.transform='scale(1.5)';});
+  el.addEventListener('mouseleave',()=>{cursor.style.transform='scale(1)';ring.style.transform='scale(1)';});
+});
+
+// TICKER
+const ticks = [
+  {n:'Air Jordan 1 Chicago',p:'$289',c:'▲12.4%',up:true},
+  {n:'Yeezy 350 Zebra',p:'$320',c:'▼5.2%',up:false},
+  {n:'Rolex Submariner',p:'$11.2K',c:'▲8.9%',up:true},
+  {n:'LV Neverfull MM',p:'$1.9K',c:'▲3.4%',up:true},
+  {n:'Supreme Box Logo',p:'$420',c:'▼8.1%',up:false},
+  {n:'Nike Dunk Low Panda',p:'$145',c:'▲4.2%',up:true},
+];
+const ticker = document.getElementById('ticker');
+const tHTML = ticks.map(t=>`
+  <span class="tick-item">
+    <span class="n">${t.n}</span>
+    <span class="p">${t.p}</span>
+    <span class="${t.up?'up':'dn'}">${t.c}</span>
+  </span>`).join('');
+ticker.innerHTML = tHTML + tHTML;
+
+// PASSWORD TOGGLE
+function togglePassword(id, btn) {
+  const input = document.getElementById(id);
+  if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
+  else { input.type = 'password'; btn.textContent = '👁'; }
+}
+
+// VALIDATE
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// LOGIN HANDLER
+async function handleLogin() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const btn = document.getElementById('loginBtn');
+  const btnText = document.getElementById('loginBtnText');
+  const loginError = document.getElementById('loginError');
+
+  // Clear errors
+  document.getElementById('emailError').classList.remove('show');
+  document.getElementById('passwordError').classList.remove('show');
+  document.getElementById('email').classList.remove('error');
+  document.getElementById('password').classList.remove('error');
+  loginError.classList.remove('show');
+
+  // Validate
+  let valid = true;
+  if (!validateEmail(email)) {
+    document.getElementById('emailError').classList.add('show');
+    document.getElementById('email').classList.add('error');
+    valid = false;
+  }
+  if (password.length < 8) {
+    document.getElementById('passwordError').classList.add('show');
+    document.getElementById('password').classList.add('error');
+    valid = false;
+  }
+  if (!valid) return;
+
+  // Show loading
+  btn.disabled = true;
+  btnText.textContent = 'Signing in...';
+
+  try {
+    const res = await fetch('http://localhost:3000/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+
+    if (res.ok && data.token) {
+      // Save token
+      localStorage.setItem('driptrack_token', data.token);
+      localStorage.setItem('driptrack_user', JSON.stringify(data.user));
+      // Show success
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('successMsg').classList.add('show');
+      // Redirect after 1.5s
+      setTimeout(() => window.location.href = 'index.html', 1500);
+    } else {
+      loginError.textContent = data.message || 'Invalid email or password';
+      loginError.classList.add('show');
+      btn.disabled = false;
+      btnText.textContent = 'Sign In →';
+    }
+  } catch {
+    loginError.textContent = '⚠️ Cannot connect to server — make sure backend is running';
+    loginError.classList.add('show');
+    btn.disabled = false;
+    btnText.textContent = 'Sign In →';
+  }
+}
+
+async function forgotPassword(e) {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+
+  if (!validateEmail(email)) {
+    document.getElementById('emailError').classList.add('show');
+    document.getElementById('email').classList.add('error');
+    document.getElementById('email').focus();
+    return;
+  }
+
+  // Show loading state on the forgot link
+  const link = document.querySelector('.forgot');
+  const originalText = link.textContent;
+  link.textContent = 'Sending...';
+  link.style.color = 'var(--accent)';
+
+  try {
+    const res = await fetch('http://localhost:3000/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+
+    // Always show success message (security best practice — don't reveal if email exists)
+    link.textContent = originalText;
+    link.style.color = '';
+
+    // Show success message
+    const loginError = document.getElementById('loginError');
+    loginError.style.color = 'var(--up)';
+    loginError.style.background = 'rgba(57,255,20,0.08)';
+    loginError.style.borderColor = 'rgba(57,255,20,0.2)';
+    loginError.textContent = '✓ Password reset email sent to ' + email + ' — check your inbox!';
+    loginError.classList.add('show');
+
+    // Reset style after 5 seconds
+    setTimeout(() => {
+      loginError.classList.remove('show');
+      loginError.style.color = '';
+      loginError.style.background = '';
+      loginError.style.borderColor = '';
+    }, 5000);
+
+  } catch (err) {
+    link.textContent = originalText;
+    link.style.color = '';
+    const loginError = document.getElementById('loginError');
+    loginError.style.color = '';
+    loginError.textContent = '⚠️ Cannot connect to server — make sure backend is running';
+    loginError.classList.add('show');
+  }
+}
+
+function socialLogin(provider) {
+  alert(`${provider} login coming soon! Use email/password for now.`);
+}
+
+// Enter key support
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLogin();
+});
+</script>
+</body>
+</html>
