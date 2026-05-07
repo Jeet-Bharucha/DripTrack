@@ -1,1 +1,35 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Environment variables
+.env
 backend/.env
+*.env.local
+*.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code
+.claude/
+
+# Editor directories
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build output
+dist/
+build/
