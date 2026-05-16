@@ -20,8 +20,9 @@
   --accent:#b8cc00;--accent2:#ff3c3c;--up:#1a8a00;--down:#cc2200;
   --card-bg:#ffffff;--nav-bg:rgba(245,245,240,0.95);
 }
-*{margin:0;padding:0;box-sizing:border-box;transition:background 0.3s,color 0.2s,border-color 0.2s;}
-body{background:var(--bg);color:var(--text);font-family:'Barlow Condensed',sans-serif;min-height:100vh;cursor:none;}
+*{margin:0;padding:0;box-sizing:border-box;cursor:none !important;transition:background 0.3s,color 0.2s,border-color 0.2s;}
+html,body,*,*::before,*::after{cursor:none !important;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow Condensed',sans-serif;min-height:100vh;cursor:none !important;}
 .cursor{position:fixed;width:10px;height:10px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;opacity:0;mix-blend-mode:difference;}
 .cursor-ring{position:fixed;width:32px;height:32px;border:1px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;opacity:0;transition:all 0.15s ease;}
 
@@ -125,6 +126,52 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:cen
 .auth-wall-btns{display:flex;gap:12px;justify-content:center;}
 .auth-btn-primary{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 28px;background:var(--accent);color:#000;text-decoration:none;font-weight:700;}
 .auth-btn-secondary{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 28px;background:transparent;color:var(--text);border:1px solid var(--border2);text-decoration:none;}
+
+@media(max-width:768px){
+  /* NAV */
+  nav{padding:12px 16px;}
+  .theme-label{display:none;}
+  .nav-link{display:none;}
+
+  /* LAYOUT */
+  .page{padding:72px 16px 40px;}
+  .page-title{font-size:40px;}
+
+  /* TABS — scrollable on mobile */
+  .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;gap:0;}
+  .tabs::-webkit-scrollbar{height:2px;}
+  .tab{white-space:nowrap;padding:12px 16px;font-size:9px;}
+
+  /* CARDS */
+  .card{padding:20px 16px;}
+
+  /* PROFILE GRID — single column */
+  .profile-grid{grid-template-columns:1fr;}
+
+  /* WATCHLIST GRID */
+  .watchlist-grid{grid-template-columns:1fr;}
+
+  /* STATS ROW */
+  div[style*="display:grid"][style*="grid-template-columns:repeat(4"]{
+    grid-template-columns:1fr 1fr !important;
+  }
+
+  /* AUTH WALL */
+  .auth-wall{padding:80px 20px;}
+  .auth-wall-btns{flex-direction:column;}
+
+  /* SAVE BTN */
+  .save-btn,.danger-btn{width:100%;text-align:center;}
+}
+@media(max-width:480px){
+  .page{padding:68px 12px 32px;}
+  .page-title{font-size:32px;}
+  .tab{padding:10px 12px;}
+  .card{padding:16px 12px;}
+  div[style*="display:grid"][style*="grid-template-columns:repeat(4"]{
+    grid-template-columns:1fr !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -152,15 +199,16 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:cen
 
   <!-- STATS -->
   <div class="stats-row">
-    <div class="stat-card"><div class="stat-num" id="statWatchlist">0</div><div class="stat-label">Watchlist Items</div></div>
-    <div class="stat-card"><div class="stat-num" id="statAlerts">0</div><div class="stat-label">Price Alerts</div></div>
-    <div class="stat-card"><div class="stat-num" id="statLogins">0</div><div class="stat-label">Total Logins</div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="document.querySelector('[onclick*=\"watchlist\"]').click()"><div class="stat-num" id="statWatchlist">0</div><div class="stat-label">Watchlist Items</div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="document.querySelector('[onclick*=\"alerts\"]').click()"><div class="stat-num" id="statAlerts">0</div><div class="stat-label">Price Alerts</div></div>
+    <div class="stat-card" style="cursor:pointer" onclick="document.querySelector('[onclick*=\"savings\"]').click()"><div class="stat-num" id="statSaved" style="color:var(--up)">$0</div><div class="stat-label">Total Saved</div></div>
     <div class="stat-card"><div class="stat-num" id="statDays">0</div><div class="stat-label">Days Active</div></div>
   </div>
 
   <!-- TABS -->
   <div class="tabs">
     <button class="tab active" onclick="showTab('watchlist',this)">❤️ Watchlist</button>
+    <button class="tab" onclick="showTab('savings',this)">💰 Savings</button>
     <button class="tab" onclick="showTab('profile',this)">👤 Profile</button>
     <button class="tab" onclick="showTab('alerts',this)">🔔 Price Alerts</button>
     <button class="tab" onclick="showTab('history',this)">🕐 Login History</button>
@@ -169,6 +217,52 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:cen
   <!-- WATCHLIST TAB -->
   <div class="tab-content active" id="tab-watchlist">
     <div id="watchlistContent"></div>
+  </div>
+
+  <!-- SAVINGS TAB -->
+  <div class="tab-content" id="tab-savings">
+    <div class="card" style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div class="card-title" style="margin-bottom:0">💰 Your Savings Dashboard</div>
+        <button onclick="openLogSavingModal()"
+          style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+                 padding:10px 20px;background:var(--accent);color:#000;border:none;cursor:pointer;font-weight:700;transition:opacity 0.2s"
+          onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+          + Log a Saving
+        </button>
+      </div>
+      <p style="font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--text2);margin-bottom:24px;letter-spacing:0.5px">
+        Every time you buy at a lower price than the market rate, log it here. DripTrack tracks your running total.
+      </p>
+      <!-- Savings summary row -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:32px">
+        <div style="background:var(--bg4);border:1px solid var(--border);padding:24px;text-align:center">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--up);letter-spacing:2px;line-height:1" id="totalSavedAmt">$0</div>
+          <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text3);margin-top:6px;text-transform:uppercase">Total Saved</div>
+        </div>
+        <div style="background:var(--bg4);border:1px solid var(--border);padding:24px;text-align:center">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--accent);letter-spacing:2px;line-height:1" id="totalAlertsFired">0</div>
+          <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text3);margin-top:6px;text-transform:uppercase">Alerts Triggered</div>
+        </div>
+        <div style="background:var(--bg4);border:1px solid var(--border);padding:24px;text-align:center">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--accent);letter-spacing:2px;line-height:1" id="avgSavingPct">0%</div>
+          <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text3);margin-top:6px;text-transform:uppercase">Avg Discount</div>
+        </div>
+      </div>
+      <!-- Savings history list -->
+      <div id="savingsHistory"></div>
+    </div>
+
+    <!-- Potential savings from current watchlist -->
+    <div class="card">
+      <div class="card-title">📊 Potential Savings On Your Watchlist</div>
+      <p style="font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--text2);margin-bottom:24px;letter-spacing:0.5px">
+        Based on price variance across sources right now — how much you could save by buying smart.
+      </p>
+      <div id="potentialSavings">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);padding:20px 0">Loading watchlist prices...</div>
+      </div>
+    </div>
   </div>
 
   <!-- PROFILE TAB -->
@@ -289,6 +383,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;align-items:cen
 </div>
 
 <script>
+(function(){var s=document.createElement('style');s.textContent='html,body,*,*::before,*::after{cursor:none!important}';document.documentElement.appendChild(s);})();
 // ── CURSOR
 const cursor = document.getElementById('cursor');
 const ring = document.getElementById('cursorRing');
@@ -345,7 +440,9 @@ async function loadAccount() {
   // Stats
   const days = Math.floor((Date.now() - new Date(currentUser.createdAt || Date.now()).getTime()) / 86400000);
   document.getElementById('statDays').textContent = Math.max(days, 1);
-  document.getElementById('statLogins').textContent = parseInt(localStorage.getItem('driptrack_logins') || '1');
+  const savingsLog = JSON.parse(localStorage.getItem('driptrack_savings_log') || '[]');
+  const totalSaved = savingsLog.reduce((s, x) => s + (x.saved || 0), 0);
+  document.getElementById('statSaved').textContent = '$' + totalSaved.toFixed(0);
 }
 
 // ── TABS
@@ -354,6 +451,102 @@ function showTab(name, btn) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'savings') loadSavings();
+}
+
+// ── SAVINGS DASHBOARD
+function loadSavings() {
+  const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `http://${window.location.hostname}:3000/api`
+    : `${window.location.origin}/api`;
+
+  // Load recorded savings from localStorage
+  const saved = JSON.parse(localStorage.getItem('driptrack_savings_log') || '[]');
+  const totalSaved = saved.reduce((sum, s) => sum + (s.saved || 0), 0);
+  const avgPct = saved.length ? (saved.reduce((sum, s) => sum + (s.pct || 0), 0) / saved.length).toFixed(1) : 0;
+
+  document.getElementById('totalSavedAmt').textContent = '$' + totalSaved.toFixed(2);
+  document.getElementById('totalAlertsFired').textContent = saved.length;
+  document.getElementById('avgSavingPct').textContent = avgPct + '%';
+
+  const histEl = document.getElementById('savingsHistory');
+  if (!saved.length) {
+    histEl.innerHTML = `
+      <div style="text-align:center;padding:40px 0;border-top:1px solid var(--border)">
+        <div style="font-size:36px;margin-bottom:12px">🔔</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--text2);margin-bottom:8px">No savings recorded yet</div>
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);line-height:1.8">
+          Set price alerts on products you want.<br>When the price drops, we'll notify you — and log your saving here.
+        </div>
+        <a href="index.html" style="display:inline-block;margin-top:20px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:12px 24px;background:var(--accent);color:#000;text-decoration:none;font-weight:700">
+          Set Alerts →
+        </a>
+      </div>`;
+  } else {
+    histEl.innerHTML = `
+      <div style="border-top:1px solid var(--border);margin-top:8px">
+        ${saved.map(s => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;margin-bottom:4px">${s.product || 'Product'}</div>
+              <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--text3)">
+                Was $${s.was?.toFixed(2)} → Bought at $${s.paid?.toFixed(2)} · ${new Date(s.date).toLocaleDateString()}
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--up)">-$${s.saved?.toFixed(2)}</div>
+              <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--up)">${s.pct?.toFixed(1)}% off</div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  // Potential savings from watchlist
+  loadPotentialSavings(API_BASE);
+}
+
+async function loadPotentialSavings(API_BASE) {
+  const watchlist = JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
+  const el = document.getElementById('potentialSavings');
+  if (!watchlist.length) {
+    el.innerHTML = `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);padding:20px 0">
+      Add items to your watchlist first → <a href="index.html" style="color:var(--accent)">Browse Products</a>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);padding:12px 0">⚡ Checking live prices...</div>`;
+  const rows = [];
+  for (const item of watchlist.slice(0, 6)) {
+    try {
+      const res = await fetch(`${API_BASE}/prices?q=${encodeURIComponent(item.title || item.name || '')}`);
+      const data = await res.json();
+      const results = (data.results || []).filter(r => r && r.price && !r.suspicious);
+      if (results.length < 2) continue;
+      const prices = results.map(r => r.price);
+      const min = Math.min(...prices), max = Math.max(...prices);
+      const saving = max - min;
+      const pct = ((saving / max) * 100).toFixed(1);
+      if (saving < 1) continue;
+      rows.push({ name: item.title || item.name, min, max, saving, pct });
+    } catch {}
+  }
+  if (!rows.length) {
+    el.innerHTML = `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);padding:20px 0">No price variance found right now — check back later.</div>`;
+    return;
+  }
+  el.innerHTML = rows.map(r => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;margin-bottom:4px">${r.name.slice(0,40)}</div>
+        <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--text3)">
+          Best: <span style="color:var(--up)">$${r.min.toFixed(2)}</span> · Highest: $${r.max.toFixed(2)}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--up)">Save $${r.saving.toFixed(2)}</div>
+        <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--up)">${r.pct}% cheaper</div>
+      </div>
+    </div>`).join('');
 }
 
 // ── WATCHLIST
@@ -635,11 +828,97 @@ function logout(e) {
   window.location.href = 'login.html';
 }
 
+// ── LOG A SAVING MODAL
+function openLogSavingModal() {
+  const existing = document.getElementById('log-saving-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'log-saving-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border2);padding:40px;max-width:420px;width:100%;position:relative">
+      <button onclick="document.getElementById('log-saving-modal').remove()"
+        style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1">✕</button>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:var(--accent);margin-bottom:20px">LOG A SAVING</div>
+      <div class="field" style="margin-bottom:16px">
+        <label class="field-label">Product Name</label>
+        <input type="text" id="ls-product" class="field-input" placeholder="Nike Air Jordan 1 Chicago"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+        <div class="field">
+          <label class="field-label">Original Price ($)</label>
+          <input type="number" id="ls-was" class="field-input" placeholder="320.00" step="0.01" min="0"/>
+        </div>
+        <div class="field">
+          <label class="field-label">You Paid ($)</label>
+          <input type="number" id="ls-paid" class="field-input" placeholder="280.00" step="0.01" min="0"/>
+        </div>
+      </div>
+      <button onclick="_submitLogSaving()"
+        style="width:100%;background:var(--accent);color:#000;border:none;font-family:'Space Mono',monospace;
+               font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:14px;cursor:pointer">
+        💰 Save Record →
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  setTimeout(() => document.getElementById('ls-product')?.focus(), 100);
+}
+
+function _submitLogSaving() {
+  const product = document.getElementById('ls-product')?.value.trim();
+  const was = parseFloat(document.getElementById('ls-was')?.value);
+  const paid = parseFloat(document.getElementById('ls-paid')?.value);
+  if (!product || !was || !paid || was <= paid) {
+    alert('Fill all fields. Original price must be higher than what you paid.');
+    return;
+  }
+  const saved = parseFloat((was - paid).toFixed(2));
+  const pct = parseFloat(((saved / was) * 100).toFixed(1));
+  const log = JSON.parse(localStorage.getItem('driptrack_savings_log') || '[]');
+  log.unshift({ product, was, paid, saved, pct, date: new Date().toISOString() });
+  localStorage.setItem('driptrack_savings_log', JSON.stringify(log));
+  // Update stat
+  const totalSaved = log.reduce((s, x) => s + (x.saved || 0), 0);
+  document.getElementById('statSaved').textContent = '$' + totalSaved.toFixed(0);
+  document.getElementById('log-saving-modal')?.remove();
+  loadSavings();
+}
+
 // Cursor refresh
 document.querySelectorAll('button,a,input,.theme-toggle,.alert-toggle').forEach(el => {
   el.addEventListener('mouseenter', () => { cursor.style.transform='scale(2)'; ring.style.transform='scale(1.5)'; });
   el.addEventListener('mouseleave', () => { cursor.style.transform='scale(1)'; ring.style.transform='scale(1)'; });
 });
 </script>
+
+<!-- MOBILE BOTTOM NAV -->
+<style>
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:600;background:rgba(10,10,10,0.97);border-top:1px solid #222;backdrop-filter:blur(12px);padding:8px 0 env(safe-area-inset-bottom,8px);}
+.bottom-nav-items{display:flex;justify-content:space-around;align-items:center;}
+.bottom-nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 12px;background:none;border:none;font-family:'Space Mono',monospace;font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#888;cursor:pointer;transition:color 0.2s;text-decoration:none;position:relative;min-width:56px;}
+.bottom-nav-item .bnav-icon{font-size:20px;line-height:1;}
+.bottom-nav-item.active,.bottom-nav-item:hover{color:#e8ff00;}
+@media(max-width:768px){.bottom-nav{display:block;}body{padding-bottom:72px;}}
+</style>
+<nav class="bottom-nav">
+  <div class="bottom-nav-items">
+    <a class="bottom-nav-item" href="/">
+      <span class="bnav-icon">🏠</span><span>Home</span>
+    </a>
+    <a class="bottom-nav-item" href="/?focus=search">
+      <span class="bnav-icon">🔍</span><span>Search</span>
+    </a>
+    <a class="bottom-nav-item" href="watchlist.html">
+      <span class="bnav-icon">❤️</span><span>Watchlist</span>
+    </a>
+    <a class="bottom-nav-item active" href="account.html">
+      <span class="bnav-icon">🔔</span><span>Alerts</span>
+    </a>
+    <a class="bottom-nav-item" href="account.html">
+      <span class="bnav-icon">👤</span><span>Account</span>
+    </a>
+  </div>
+</nav>
 </body>
 </html>

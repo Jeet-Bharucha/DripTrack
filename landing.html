@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DRIPTRACK — Never Overpay Again</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230a0a0a'/><rect x='2' y='2' width='28' height='28' fill='none' stroke='%23e8ff00' stroke-width='1.5'/><text x='16' y='22' font-family='Arial Black,sans-serif' font-weight='900' font-size='14' fill='%23e8ff00' text-anchor='middle'>DT</text></svg>">
+<meta name="theme-color" content="#0a0a0a">
+<meta property="og:title" content="DRIPTRACK — Real-Time Price Intelligence">
+<meta property="og:description" content="Track sneakers, watches, bags & streetwear prices across Nike, StockX, GOAT, Amazon & more. Never overpay again.">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --black:#0a0a0a;--grey-900:#111;--grey-800:#1a1a1a;--grey-700:#252525;
+  --grey-600:#333;--grey-400:#666;--grey-200:#aaa;--white:#f0f0f0;
+  --accent:#e8ff00;--accent2:#ff3c3c;--up:#39ff14;--down:#ff3c3c;
+}
+*{margin:0;padding:0;box-sizing:border-box;cursor:none !important;}
+html,body,*,*::before,*::after{cursor:none !important;}
+html{scroll-behavior:smooth;}
+body{background:var(--black);color:var(--white);font-family:'Barlow Condensed',sans-serif;overflow-x:hidden;}
+
+/* NOISE OVERLAY */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:1000;opacity:0.4;}
+
+/* CURSOR */
+.cursor{position:fixed;width:12px;height:12px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;opacity:0;transition:transform 0.1s ease;mix-blend-mode:difference;}
+.cursor-ring{position:fixed;width:36px;height:36px;border:1px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;opacity:0;transition:all 0.15s ease;}
+
+/* ── NAV ────────────────────────────────── */
+nav{position:fixed;top:0;left:0;right:0;z-index:500;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 48px;
+  background:rgba(10,10,10,0);
+  backdrop-filter:blur(0px);
+  border-bottom:1px solid transparent;
+  transition:all 0.4s ease;}
+nav.scrolled{background:rgba(10,10,10,0.92);backdrop-filter:blur(16px);border-bottom-color:var(--grey-700);}
+.nav-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:5px;color:var(--accent);text-decoration:none;}
+.nav-logo span{color:var(--white);}
+.nav-links{display:flex;gap:36px;list-style:none;}
+.nav-links a{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--grey-200);text-decoration:none;transition:color 0.2s;}
+.nav-links a:hover{color:var(--accent);}
+.nav-actions{display:flex;gap:12px;align-items:center;}
+.btn-nav-ghost{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--white);background:transparent;border:1px solid var(--grey-600);padding:10px 20px;cursor:none;transition:all 0.2s;text-decoration:none;}
+.btn-nav-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-nav-cta{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--black);background:var(--accent);border:none;padding:10px 20px;cursor:none;font-weight:700;transition:all 0.2s;text-decoration:none;}
+.btn-nav-cta:hover{background:var(--white);}
+.hamburger{display:none;flex-direction:column;gap:5px;background:none;border:none;padding:4px;}
+.hamburger span{display:block;width:24px;height:2px;background:var(--accent);transition:all 0.3s;}
+.mobile-menu{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,10,0.98);z-index:499;padding:100px 32px 40px;flex-direction:column;gap:24px;}
+.mobile-menu.open{display:flex;}
+.mobile-menu a{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;color:var(--grey-200);text-decoration:none;border-bottom:1px solid var(--grey-800);padding-bottom:20px;}
+.mobile-menu a:hover{color:var(--accent);}
+
+/* ── HERO ───────────────────────────────── */
+.hero{
+  min-height:100dvh;display:flex;flex-direction:column;justify-content:center;
+  padding:120px 48px 80px;position:relative;overflow:hidden;
+}
+.hero-bg{position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 70% 60% at 80% 30%,rgba(232,255,0,0.07) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 70% at 10% 80%,rgba(57,255,20,0.04) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 40% at 50% 50%,rgba(0,0,0,0) 0%,#0a0a0a 100%);
+}
+.hero-grid{position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);
+  background-size:64px 64px;}
+
+.hero-content{position:relative;z-index:2;max-width:900px;}
+.hero-eyebrow{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:5px;color:var(--accent);text-transform:uppercase;margin-bottom:28px;display:flex;align-items:center;gap:10px;}
+.live-dot{width:7px;height:7px;background:var(--up);border-radius:50%;animation:blink 1.2s ease-in-out infinite;flex-shrink:0;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
+
+.hero-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(72px,13vw,172px);line-height:0.88;letter-spacing:2px;margin-bottom:32px;}
+.hero-title .line-accent{color:var(--accent);}
+.hero-title .line-outline{color:transparent;-webkit-text-stroke:1px rgba(240,240,240,0.2);}
+
+.hero-sub{font-family:'Barlow Condensed',sans-serif;font-size:clamp(17px,2.5vw,22px);color:var(--grey-200);letter-spacing:1px;line-height:1.5;max-width:540px;margin-bottom:48px;}
+
+.hero-cta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:72px;}
+.btn-primary{font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--black);background:var(--accent);border:none;padding:18px 36px;cursor:none;font-weight:700;transition:all 0.2s;text-decoration:none;display:inline-flex;align-items:center;gap:10px;position:relative;overflow:hidden;}
+.btn-primary::after{content:'';position:absolute;inset:0;background:white;transform:translateX(-101%);transition:transform 0.2s ease;}
+.btn-primary:hover::after{transform:translateX(0);}
+.btn-primary span{position:relative;z-index:1;}
+.btn-secondary{font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--white);background:transparent;border:1px solid var(--grey-600);padding:18px 36px;cursor:none;transition:all 0.2s;text-decoration:none;}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+
+.hero-stats{display:flex;gap:56px;padding-top:40px;border-top:1px solid var(--grey-700);}
+.stat-num{font-family:'Bebas Neue',sans-serif;font-size:44px;color:var(--accent);letter-spacing:2px;line-height:1;}
+.stat-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400);margin-top:4px;text-transform:uppercase;}
+
+/* Floating product cards */
+.hero-float{position:absolute;right:48px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:12px;z-index:2;}
+.float-card{background:var(--grey-900);border:1px solid var(--grey-700);padding:16px 20px;min-width:260px;animation:floatUp 0.6s ease both;}
+.float-card:nth-child(1){animation-delay:0.1s;transform:rotate(-1.5deg);}
+.float-card:nth-child(2){animation-delay:0.25s;transform:rotate(0.8deg);}
+.float-card:nth-child(3){animation-delay:0.4s;transform:rotate(-0.5deg);}
+@keyframes floatUp{from{opacity:0;transform:translateY(30px) rotate(var(--r,0deg));}to{opacity:1;transform:translateY(0) rotate(var(--r,0deg));}}
+.float-card:hover{border-color:var(--accent);transform:rotate(0deg) scale(1.02);transition:all 0.2s;}
+.fc-label{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:6px;}
+.fc-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:10px;line-height:1.1;}
+.fc-row{display:flex;justify-content:space-between;align-items:baseline;}
+.fc-price{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--white);letter-spacing:1px;}
+.fc-change{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;}
+.fc-change.up{color:var(--up);}
+.fc-change.down{color:var(--down);}
+.fc-sources{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;}
+.fc-source{font-family:'Space Mono',monospace;font-size:7px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;background:var(--grey-800);border:1px solid var(--grey-600);color:var(--grey-400);}
+
+/* ── TICKER ─────────────────────────────── */
+.ticker-bar{background:var(--grey-900);border-top:1px solid var(--grey-700);border-bottom:1px solid var(--grey-700);overflow:hidden;height:36px;display:flex;align-items:center;}
+.ticker-track{display:flex;animation:ticker 40s linear infinite;white-space:nowrap;}
+.ticker-item{display:inline-flex;align-items:center;gap:10px;padding:0 36px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;border-right:1px solid var(--grey-700);}
+.ticker-item .n{color:var(--grey-200);}
+.ticker-item .p{color:var(--white);font-weight:700;}
+.ticker-item .up{color:var(--up);}
+.ticker-item .dn{color:var(--down);}
+@keyframes ticker{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+
+/* ── BRANDS STRIP ────────────────────────── */
+.brands-strip{padding:32px 48px;background:var(--grey-900);border-bottom:1px solid var(--grey-700);}
+.brands-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--grey-400);text-transform:uppercase;text-align:center;margin-bottom:20px;}
+.brands-row{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:0;}
+.brand-pill{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:3px;padding:10px 20px;border-right:1px solid var(--grey-700);color:var(--grey-400);opacity:0.5;transition:opacity 0.2s;white-space:nowrap;}
+.brand-pill:last-child{border-right:none;}
+.brand-pill:hover{opacity:1;color:var(--accent);}
+
+/* ── FEATURES ────────────────────────────── */
+.features{padding:100px 48px;background:var(--black);}
+.section-label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--accent);text-transform:uppercase;margin-bottom:16px;}
+.section-label::before{content:'// ';}
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,6vw,72px);letter-spacing:2px;line-height:1;margin-bottom:64px;}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
+.feature-card{background:var(--grey-900);border:1px solid var(--grey-700);padding:40px 32px;transition:all 0.3s;position:relative;overflow:hidden;}
+.feature-card::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 80% at 0% 0%,rgba(232,255,0,0.04) 0%,transparent 70%);opacity:0;transition:opacity 0.3s;}
+.feature-card:hover{border-color:var(--accent);}
+.feature-card:hover::before{opacity:1;}
+.feature-icon{font-size:40px;margin-bottom:24px;display:block;}
+.feature-num{font-family:'Bebas Neue',sans-serif;font-size:80px;color:rgba(232,255,0,0.05);line-height:1;position:absolute;top:16px;right:20px;}
+.feature-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;margin-bottom:14px;color:var(--white);}
+.feature-desc{font-family:'Barlow Condensed',sans-serif;font-size:16px;color:var(--grey-200);line-height:1.6;letter-spacing:0.5px;}
+
+/* ── HOW IT WORKS ────────────────────────── */
+.how{padding:100px 48px;background:var(--grey-900);border-top:1px solid var(--grey-700);border-bottom:1px solid var(--grey-700);}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:64px;position:relative;}
+.steps::before{content:'';position:absolute;top:40px;left:16.66%;right:16.66%;height:1px;background:var(--grey-700);}
+.step{padding:0 32px;text-align:center;position:relative;}
+.step-num{font-family:'Bebas Neue',sans-serif;font-size:64px;color:var(--accent);line-height:1;margin-bottom:20px;position:relative;display:inline-block;}
+.step-num::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:40px;height:2px;background:var(--accent);}
+.step-icon{font-size:36px;margin:20px 0 20px;}
+.step-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;margin-bottom:12px;}
+.step-desc{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.5px;color:var(--grey-400);line-height:1.8;}
+
+/* ── PRODUCT SHOWCASE ────────────────────── */
+.showcase{padding:100px 48px;background:var(--black);overflow:hidden;}
+.showcase-scroll{display:flex;gap:2px;margin-top:48px;animation:scrollLeft 30s linear infinite;}
+.showcase-scroll:hover{animation-play-state:paused;}
+@keyframes scrollLeft{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+.showcase-card{min-width:280px;background:var(--grey-900);border:1px solid var(--grey-700);padding:0;flex-shrink:0;transition:all 0.3s;overflow:hidden;}
+.showcase-card:hover{border-color:var(--accent);transform:translateY(-6px);}
+.sc-img{height:180px;background:var(--grey-800);display:flex;align-items:center;justify-content:center;font-size:72px;border-bottom:1px solid var(--grey-700);}
+.sc-body{padding:20px;}
+.sc-cat{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:6px;}
+.sc-name{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;margin-bottom:12px;line-height:1.1;}
+.sc-price-row{display:flex;justify-content:space-between;align-items:baseline;}
+.sc-price{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--white);letter-spacing:1px;}
+.sc-change{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;}
+.sc-change.up{color:var(--up);}
+.sc-change.down{color:var(--down);}
+
+/* ── SOCIAL PROOF ────────────────────────── */
+.social-proof{padding:100px 48px;background:var(--grey-900);border-top:1px solid var(--grey-700);}
+.stats-big{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:80px;}
+.stat-big-card{background:var(--grey-800);border:1px solid var(--grey-700);padding:40px 32px;text-align:center;}
+.stat-big-num{font-family:'Bebas Neue',sans-serif;font-size:56px;color:var(--accent);letter-spacing:2px;line-height:1;}
+.stat-big-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400);margin-top:8px;text-transform:uppercase;}
+.testimonials{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
+.testimonial{background:var(--grey-800);border:1px solid var(--grey-700);padding:32px;transition:border-color 0.2s;}
+.testimonial:hover{border-color:var(--accent);}
+.testimonial-text{font-family:'Barlow Condensed',sans-serif;font-size:18px;color:var(--white);line-height:1.5;letter-spacing:0.5px;margin-bottom:24px;}
+.testimonial-text::before{content:'"';font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--accent);line-height:0.8;display:block;margin-bottom:12px;}
+.testimonial-author{display:flex;align-items:center;gap:12px;}
+.testimonial-avatar{width:36px;height:36px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--black);}
+.testimonial-name{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--white);text-transform:uppercase;}
+.testimonial-handle{font-family:'Space Mono',monospace;font-size:9px;color:var(--grey-400);}
+
+/* ── CTA SECTION ─────────────────────────── */
+.cta-section{
+  padding:120px 48px;background:var(--black);
+  text-align:center;position:relative;overflow:hidden;
+  border-top:1px solid var(--grey-700);
+}
+.cta-section::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(232,255,0,0.06) 0%,transparent 70%);
+}
+.cta-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(56px,10vw,120px);letter-spacing:2px;line-height:0.9;position:relative;z-index:1;margin-bottom:24px;}
+.cta-title .accent{color:var(--accent);}
+.cta-sub{font-family:'Space Mono',monospace;font-size:12px;letter-spacing:2px;color:var(--grey-200);margin-bottom:48px;position:relative;z-index:1;}
+.cta-buttons{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1;}
+.cta-note{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-400);margin-top:20px;position:relative;z-index:1;}
+
+/* ── FOOTER ──────────────────────────────── */
+footer{background:var(--grey-900);border-top:1px solid var(--grey-700);}
+.footer-top{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:48px;padding:64px 48px 48px;}
+.footer-brand .footer-logo{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:5px;color:var(--accent);display:block;margin-bottom:8px;}
+.footer-tagline{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400);text-transform:uppercase;margin-bottom:20px;}
+.footer-desc{font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--grey-400);line-height:1.6;max-width:280px;}
+.footer-col-title{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:20px;}
+.footer-links{list-style:none;display:flex;flex-direction:column;gap:12px;}
+.footer-links a{font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--grey-400);text-decoration:none;letter-spacing:1px;transition:color 0.2s;}
+.footer-links a:hover{color:var(--white);}
+.footer-bottom{display:flex;justify-content:space-between;align-items:center;padding:20px 48px;border-top:1px solid var(--grey-700);flex-wrap:wrap;gap:12px;}
+.footer-copy{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-400);}
+.footer-status{display:flex;align-items:center;gap:6px;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-400);}
+
+/* ── SCROLL REVEAL ───────────────────────── */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity 0.7s ease,transform 0.7s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.reveal-delay-1{transition-delay:0.1s;}
+.reveal-delay-2{transition-delay:0.2s;}
+.reveal-delay-3{transition-delay:0.3s;}
+
+/* ── MOBILE ──────────────────────────────── */
+@media(max-width:768px){
+  nav{padding:14px 20px;}
+  .nav-links{display:none;}
+  .nav-actions{display:none;}
+  .hamburger{display:flex;}
+
+  .hero{padding:100px 20px 60px;min-height:auto;}
+  .hero-float{display:none;}
+  .hero-title{font-size:clamp(56px,18vw,110px);}
+  .hero-stats{flex-wrap:wrap;gap:20px;}
+  .hero-cta{flex-direction:column;}
+  .btn-primary,.btn-secondary{width:100%;text-align:center;justify-content:center;}
+
+  .brands-strip{padding:24px 20px;}
+  .brands-row{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px;}
+
+  .features{padding:64px 20px;}
+  .features-grid{grid-template-columns:1fr;}
+
+  .how{padding:64px 20px;}
+  .steps{grid-template-columns:1fr;gap:40px;}
+  .steps::before{display:none;}
+  .step{text-align:left;padding:0;}
+
+  .showcase{padding:64px 0 64px 20px;}
+  .showcase-scroll{animation:none;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .showcase-scroll::-webkit-scrollbar{height:2px;}
+
+  .social-proof{padding:64px 20px;}
+  .stats-big{grid-template-columns:1fr 1fr;}
+  .testimonials{grid-template-columns:1fr;}
+
+  .cta-section{padding:80px 20px;}
+  .cta-buttons{flex-direction:column;align-items:stretch;}
+
+  .footer-top{grid-template-columns:1fr 1fr;gap:32px;padding:48px 20px 32px;}
+  .footer-brand{grid-column:1/-1;}
+  .footer-bottom{padding:16px 20px;}
+}
+
+@media(max-width:480px){
+  nav{padding:12px 16px;}
+  .hero{padding:88px 16px 48px;}
+  .hero-title{font-size:clamp(48px,20vw,80px);}
+  .features{padding:48px 16px;}
+  .how{padding:48px 16px;}
+  .social-proof{padding:48px 16px;}
+  .stats-big{grid-template-columns:1fr;}
+  .footer-top{grid-template-columns:1fr;padding:40px 16px 24px;}
+}
+</style>
+</head>
+<body>
+
+<!-- CURSOR -->
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- NAV -->
+<nav id="mainNav">
+  <a href="/landing.html" class="nav-logo">DRIP<span>TRACK</span></a>
+  <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#products">Products</a></li>
+    <li><a href="#proof">Reviews</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="/login.html" class="btn-nav-ghost">Sign In</a>
+    <a href="/register.html" class="btn-nav-cta">Get Started Free</a>
+  </div>
+</nav>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#features" onclick="toggleMenu()">Features</a>
+  <a href="#how" onclick="toggleMenu()">How It Works</a>
+  <a href="#products" onclick="toggleMenu()">Products</a>
+  <a href="/login.html">Sign In</a>
+  <a href="/register.html" style="color:var(--accent)">Get Started Free →</a>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow"><span class="live-dot"></span> Live prices — updated every 15 minutes</p>
+    <h1 class="hero-title">
+      NEVER<br>
+      <span class="line-outline">OVER</span><br>
+      <span class="line-accent">PAY.</span>
+    </h1>
+    <p class="hero-sub">Real-time price tracking across Nike, StockX, GOAT, Amazon & 8 more sources. Sneakers, watches, bags, streetwear. Set alerts, compare deals, buy smart.</p>
+    <div class="hero-cta">
+      <a href="/register.html" class="btn-primary"><span>Start Tracking Free →</span></a>
+      <a href="/app" class="btn-secondary">Browse Prices</a>
+    </div>
+    <div class="hero-stats">
+      <div><div class="stat-num" data-target="50">0</div><div class="stat-label">Products Tracked (K+)</div></div>
+      <div><div class="stat-num" data-target="12">0</div><div class="stat-label">Verified Sources</div></div>
+      <div><div class="stat-num" data-target="100">0</div><div class="stat-label">% Authentic Only</div></div>
+      <div><div class="stat-num" data-target="15">0</div><div class="stat-label">Price Updates Daily (M)</div></div>
+    </div>
+  </div>
+
+  <!-- Floating product cards -->
+  <div class="hero-float">
+    <div class="float-card">
+      <div class="fc-label">Best Price Found</div>
+      <div class="fc-name">Air Jordan 1 Retro High OG Chicago</div>
+      <div class="fc-row">
+        <div class="fc-price">$289</div>
+        <div class="fc-change up">▲ 12.4%</div>
+      </div>
+      <div class="fc-sources">
+        <span class="fc-source">StockX</span>
+        <span class="fc-source">GOAT</span>
+        <span class="fc-source">Nike</span>
+      </div>
+    </div>
+    <div class="float-card">
+      <div class="fc-label">Price Drop Alert 📉</div>
+      <div class="fc-name">Adidas Yeezy Boost 350 V2 Zebra</div>
+      <div class="fc-row">
+        <div class="fc-price">$320</div>
+        <div class="fc-change down">▼ 5.2%</div>
+      </div>
+      <div class="fc-sources">
+        <span class="fc-source">StockX</span>
+        <span class="fc-source">Adidas</span>
+      </div>
+    </div>
+    <div class="float-card">
+      <div class="fc-label">🔥 Best Deal Today</div>
+      <div class="fc-name">Rolex Submariner Date 126610LN</div>
+      <div class="fc-row">
+        <div class="fc-price">$10.9K</div>
+        <div class="fc-change up">▲ 8.9%</div>
+      </div>
+      <div class="fc-sources">
+        <span class="fc-source">Chrono24</span>
+        <span class="fc-source">Amazon</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker-bar">
+  <div class="ticker-track" id="tickerTrack"></div>
+</div>
+
+<!-- BRANDS -->
+<section class="brands-strip">
+  <p class="brands-label">Prices pulled live from</p>
+  <div class="brands-row">
+    <div class="brand-pill">STOCKX</div>
+    <div class="brand-pill">GOAT</div>
+    <div class="brand-pill">NIKE</div>
+    <div class="brand-pill">EBAY</div>
+    <div class="brand-pill">AMAZON</div>
+    <div class="brand-pill">ADIDAS</div>
+    <div class="brand-pill">FOOT LOCKER</div>
+    <div class="brand-pill">CHRONO24</div>
+    <div class="brand-pill">NEW BALANCE</div>
+    <div class="brand-pill">ZAPPOS</div>
+    <div class="brand-pill">+ MORE</div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="reveal">
+    <p class="section-label">Why DripTrack</p>
+    <h2 class="section-title">BUILT FOR<br><span style="color:var(--accent)">SMART BUYERS</span></h2>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card reveal reveal-delay-1">
+      <span class="feature-num">01</span>
+      <span class="feature-icon">⚡</span>
+      <h3 class="feature-title">Real-Time Prices</h3>
+      <p class="feature-desc">Prices refresh every 15 minutes across 12+ sources. You always see the freshest data, never cached numbers from last week.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-2">
+      <span class="feature-num">02</span>
+      <span class="feature-icon">🔔</span>
+      <h3 class="feature-title">Instant Alerts</h3>
+      <p class="feature-desc">Set a target price and we email + push-notify you the moment it drops. Our system checks every 30 minutes, around the clock.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-3">
+      <span class="feature-num">03</span>
+      <span class="feature-icon">✅</span>
+      <h3 class="feature-title">Authenticity Check</h3>
+      <p class="feature-desc">Every listing is scored for authenticity. Suspiciously low prices are automatically flagged so you never buy a fake.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-1">
+      <span class="feature-num">04</span>
+      <span class="feature-icon">📊</span>
+      <h3 class="feature-title">Price History Charts</h3>
+      <p class="feature-desc">See 7, 30, and 90-day price trends for any product. Know instantly if today's price is a genuine deal or just average.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-2">
+      <span class="feature-num">05</span>
+      <span class="feature-icon">⚖️</span>
+      <h3 class="feature-title">Side-by-Side Compare</h3>
+      <p class="feature-desc">Select up to 3 products and compare prices, sources, and authenticity scores side by side. Never guess which is the better deal.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-3">
+      <span class="feature-num">06</span>
+      <span class="feature-icon">❤️</span>
+      <h3 class="feature-title">Personal Watchlist</h3>
+      <p class="feature-desc">Save items you're watching and track your savings history. See exactly how much DripTrack has saved you over time.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="how">
+  <div class="reveal">
+    <p class="section-label">How It Works</p>
+    <h2 class="section-title">THREE STEPS TO<br><span style="color:var(--accent)">SMARTER BUYING</span></h2>
+  </div>
+  <div class="steps">
+    <div class="step reveal reveal-delay-1">
+      <div class="step-num">01</div>
+      <div class="step-icon">🔍</div>
+      <h3 class="step-title">Search Any Product</h3>
+      <p class="step-desc">Type any sneaker, watch, bag or streetwear item. We scan Nike, GOAT, StockX, eBay, Amazon and more — simultaneously.</p>
+    </div>
+    <div class="step reveal reveal-delay-2">
+      <div class="step-num">02</div>
+      <div class="step-icon">📈</div>
+      <h3 class="step-title">Compare All Prices</h3>
+      <p class="step-desc">See every listing side by side with a Deal Score, authenticity check, and full price history chart. Spot the best deal in seconds.</p>
+    </div>
+    <div class="step reveal reveal-delay-3">
+      <div class="step-num">03</div>
+      <div class="step-icon">🛒</div>
+      <h3 class="step-title">Set Alerts & Buy Smart</h3>
+      <p class="step-desc">Set your target price and get notified the moment it drops. We watch 24/7 so you don't have to — buy when the time is right.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRODUCT SHOWCASE -->
+<section class="showcase" id="products">
+  <div class="reveal" style="padding-right:48px">
+    <p class="section-label">What We Track</p>
+    <h2 class="section-title">SNEAKERS, WATCHES,<br><span style="color:var(--accent)">BAGS & MORE</span></h2>
+  </div>
+  <div class="showcase-scroll" id="showcaseScroll">
+    <!-- Cards duplicated for infinite scroll effect -->
+    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">Air Jordan 1 Retro High OG</div><div class="sc-price-row"><span class="sc-price">$289</span><span class="sc-change up">▲ 12.4%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">⌚</div><div class="sc-body"><div class="sc-cat">Watches</div><div class="sc-name">Rolex Submariner Date 41mm</div><div class="sc-price-row"><span class="sc-price">$10.9K</span><span class="sc-change up">▲ 8.9%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">👜</div><div class="sc-body"><div class="sc-cat">Bags</div><div class="sc-name">Louis Vuitton Neverfull MM</div><div class="sc-price-row"><span class="sc-price">$1,860</span><span class="sc-change up">▲ 3.4%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">🧢</div><div class="sc-body"><div class="sc-cat">Streetwear</div><div class="sc-name">Supreme Box Logo Hoodie</div><div class="sc-price-row"><span class="sc-price">$420</span><span class="sc-change down">▼ 8.1%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">🕶️</div><div class="sc-body"><div class="sc-cat">Sunglasses</div><div class="sc-name">Ray-Ban Aviator Classic</div><div class="sc-price-row"><span class="sc-price">$168</span><span class="sc-change up">▲ 2.1%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">Yeezy Boost 350 V2 Zebra</div><div class="sc-price-row"><span class="sc-price">$320</span><span class="sc-change down">▼ 5.2%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">⌚</div><div class="sc-body"><div class="sc-cat">Watches</div><div class="sc-name">AP Royal Oak 15500ST</div><div class="sc-price-row"><span class="sc-price">$38.5K</span><span class="sc-change up">▲ 12.1%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">New Balance 550 White/Green</div><div class="sc-price-row"><span class="sc-price">$110</span><span class="sc-change down">▼ 3.7%</span></div></div></div>
+    <!-- Duplicate for loop -->
+    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">Air Jordan 1 Retro High OG</div><div class="sc-price-row"><span class="sc-price">$289</span><span class="sc-change up">▲ 12.4%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">⌚</div><div class="sc-body"><div class="sc-cat">Watches</div><div class="sc-name">Rolex Submariner Date 41mm</div><div class="sc-price-row"><span class="sc-price">$10.9K</span><span class="sc-change up">▲ 8.9%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">👜</div><div class="sc-body"><div class="sc-cat">Bags</div><div class="sc-name">Louis Vuitton Neverfull MM</div><div class="sc-price-row"><span class="sc-price">$1,860</span><span class="sc-change up">▲ 3.4%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">🧢</div><div class="sc-body"><div class="sc-cat">Streetwear</div><div class="sc-name">Supreme Box Logo Hoodie</div><div class="sc-price-row"><span class="sc-price">$420</span><span class="sc-change down">▼ 8.1%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">🕶️</div><div class="sc-body"><div class="sc-cat">Sunglasses</div><div class="sc-name">Ray-Ban Aviator Classic</div><div class="sc-price-row"><span class="sc-price">$168</span><span class="sc-change up">▲ 2.1%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">Yeezy Boost 350 V2 Zebra</div><div class="sc-price-row"><span class="sc-price">$320</span><span class="sc-change down">▼ 5.2%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">⌚</div><div class="sc-body"><div class="sc-cat">Watches</div><div class="sc-name">AP Royal Oak 15500ST</div><div class="sc-price-row"><span class="sc-price">$38.5K</span><span class="sc-change up">▲ 12.1%</span></div></div></div>
+    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">New Balance 550 White/Green</div><div class="sc-price-row"><span class="sc-price">$110</span><span class="sc-change down">▼ 3.7%</span></div></div></div>
+  </div>
+</section>
+
+<!-- SOCIAL PROOF -->
+<section class="social-proof" id="proof">
+  <div class="reveal">
+    <p class="section-label">Trusted By Buyers</p>
+    <h2 class="section-title">REAL PEOPLE,<br><span style="color:var(--accent)">REAL SAVINGS</span></h2>
+  </div>
+  <div class="stats-big">
+    <div class="stat-big-card reveal reveal-delay-1"><div class="stat-big-num">$2.4M+</div><div class="stat-big-label">Saved By Users</div></div>
+    <div class="stat-big-card reveal reveal-delay-2"><div class="stat-big-num">98%</div><div class="stat-big-label">Authentic Listings</div></div>
+    <div class="stat-big-card reveal reveal-delay-3"><div class="stat-big-num">50K+</div><div class="stat-big-label">Products Tracked</div></div>
+    <div class="stat-big-card reveal"><div class="stat-big-num">4.9★</div><div class="stat-big-label">User Rating</div></div>
+  </div>
+  <div class="testimonials">
+    <div class="testimonial reveal reveal-delay-1">
+      <p class="testimonial-text">DripTrack saved me $340 on a pair of Jordan 4s. The alert went off at 2am and I bought them before anyone else could. Absolute game changer.</p>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">J</div>
+        <div><div class="testimonial-name">Jordan M.</div><div class="testimonial-handle">@sneakerhead_jm · Sneaker Collector</div></div>
+      </div>
+    </div>
+    <div class="testimonial reveal reveal-delay-2">
+      <p class="testimonial-text">I track Rolex prices here every day. The authenticity checker flagged a listing that was clearly too good — saved me from a fake. Worth every second.</p>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">A</div>
+        <div><div class="testimonial-name">Alex R.</div><div class="testimonial-handle">@watchguy_alex · Watch Enthusiast</div></div>
+      </div>
+    </div>
+    <div class="testimonial reveal reveal-delay-3">
+      <p class="testimonial-text">Finally something that actually tracks luxury bag prices in real-time. I compared 6 sources for my LV Neverfull and saved $200 over what I would've paid.</p>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">S</div>
+        <div><div class="testimonial-name">Sarah K.</div><div class="testimonial-handle">@luxelifestyle · Bag Collector</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2 class="cta-title reveal">START TRACKING<br><span class="accent">FOR FREE.</span></h2>
+  <p class="cta-sub reveal">No credit card. No catch. Set your first alert in 60 seconds.</p>
+  <div class="cta-buttons reveal">
+    <a href="/register.html" class="btn-primary"><span>Create Free Account →</span></a>
+    <a href="/app" class="btn-secondary">Browse Without Signing Up</a>
+  </div>
+  <p class="cta-note reveal">Already have an account? <a href="/login.html" style="color:var(--accent);text-decoration:none">Sign in →</a></p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <span class="footer-logo">DRIPTRACK</span>
+      <p class="footer-tagline">Real Prices. Real Products. Real Time.</p>
+      <p class="footer-desc">Real-time price intelligence for sneakers, watches, bags and streetwear. Only authentic products tracked.</p>
+    </div>
+    <div>
+      <p class="footer-col-title">Product</p>
+      <ul class="footer-links">
+        <li><a href="/app">Price Tracker</a></li>
+        <li><a href="/watchlist.html">My Watchlist</a></li>
+        <li><a href="/account.html">Price Alerts</a></li>
+        <li><a href="/register.html">Create Account</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="footer-col-title">Categories</p>
+      <ul class="footer-links">
+        <li><a href="/app?q=sneakers">Sneakers</a></li>
+        <li><a href="/app?q=watches">Watches</a></li>
+        <li><a href="/app?q=bags">Bags</a></li>
+        <li><a href="/app?q=streetwear">Streetwear</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="footer-col-title">Company</p>
+      <ul class="footer-links">
+        <li><a href="#">About</a></li>
+        <li><a href="#">Blog</a></li>
+        <li><a href="#">Privacy Policy</a></li>
+        <li><a href="#">Terms of Service</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span class="footer-copy">© 2026 DRIPTRACK. All rights reserved.</span>
+    <div class="footer-status"><span class="live-dot"></span> All systems operational</div>
+  </div>
+</footer>
+
+<script>
+// ── CURSOR
+(function(){var s=document.createElement('style');s.textContent='html,body,*,*::before,*::after{cursor:none!important}';document.documentElement.appendChild(s);})();
+const cursor=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
+document.addEventListener('mousemove',e=>{cursor.style.opacity='1';ring.style.opacity='0.5';cursor.style.left=(e.clientX-6)+'px';cursor.style.top=(e.clientY-6)+'px';ring.style.left=(e.clientX-18)+'px';ring.style.top=(e.clientY-18)+'px';});
+document.addEventListener('mouseleave',()=>{cursor.style.opacity='0';ring.style.opacity='0';});
+document.addEventListener('mouseover',e=>{if(e.target.closest('button,a,input')){cursor.style.transform='scale(2.5)';ring.style.transform='scale(1.5)';}else{cursor.style.transform='scale(1)';ring.style.transform='scale(1)';}});
+
+// ── NAV SCROLL EFFECT
+window.addEventListener('scroll',()=>{
+  document.getElementById('mainNav').classList.toggle('scrolled',window.scrollY>60);
+});
+
+// ── MOBILE MENU
+function toggleMenu(){
+  document.getElementById('mobileMenu').classList.toggle('open');
+}
+document.getElementById('mobileMenu').addEventListener('click',e=>{if(e.target.tagName==='A')toggleMenu();});
+
+// ── TICKER
+const tickerData=[
+  {n:'Air Jordan 1 Chicago',p:'$289',c:'+12.4%',up:true},
+  {n:'Yeezy 350 Zebra',p:'$320',c:'-5.2%',up:false},
+  {n:'Rolex Submariner',p:'$10.9K',c:'+8.9%',up:true},
+  {n:'LV Neverfull MM',p:'$1,860',c:'+3.4%',up:true},
+  {n:'Supreme Box Logo',p:'$420',c:'-8.1%',up:false},
+  {n:'AP Royal Oak',p:'$38.5K',c:'+12.1%',up:true},
+  {n:'Nike Dunk Low Panda',p:'$145',c:'+4.2%',up:true},
+  {n:'Adidas Samba OG',p:'$100',c:'+14.2%',up:true},
+  {n:'Hermès Birkin 30',p:'$24K',c:'+9.8%',up:true},
+  {n:'Chanel Classic Flap',p:'$8.2K',c:'+7.4%',up:true},
+  {n:'NB 550 White/Green',p:'$110',c:'-3.7%',up:false},
+  {n:'Off-White x AF1',p:'$650',c:'+5.3%',up:true},
+];
+const html=tickerData.map(t=>`<span class="ticker-item"><span class="n">${t.n}</span><span class="p">${t.p}</span><span class="${t.up?'up':'dn'}">${t.up?'▲':'▼'}${t.c.replace(/[+-]/,'')}</span></span>`).join('');
+document.getElementById('tickerTrack').innerHTML=html+html;
+
+// ── COUNTER ANIMATION
+function animateCount(el){
+  const target=+el.dataset.target;
+  let current=0;
+  const step=target/60;
+  const timer=setInterval(()=>{
+    current=Math.min(current+step,target);
+    el.textContent=Math.floor(current);
+    if(current>=target){el.textContent=target;clearInterval(timer);}
+  },20);
+}
+const counters=document.querySelectorAll('.stat-num[data-target]');
+const countObs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting){animateCount(e.target);countObs.unobserve(e.target);}});
+},{threshold:0.5});
+counters.forEach(c=>countObs.observe(c));
+
+// ── SCROLL REVEAL
+const revealObs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});
+},{threshold:0.1,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
+
+// ── AUTH STATE — swap CTA if already logged in
+(function(){
+  const token=localStorage.getItem('driptrack_token');
+  const userStr=localStorage.getItem('driptrack_user');
+  if(token&&userStr){
+    try{
+      const u=JSON.parse(userStr);
+      // Replace "Get Started Free" with "Go to App"
+      document.querySelectorAll('a[href="/register.html"]').forEach(a=>{
+        a.href='/app';
+        a.querySelector('span') ? a.querySelector('span').textContent=`Welcome back, ${u.firstName} →` : a.textContent=`Welcome back, ${u.firstName} →`;
+      });
+      // Replace sign in with account
+      document.querySelectorAll('a[href="/login.html"]').forEach(a=>{
+        if(a.textContent.trim().toLowerCase().includes('sign')){a.href='/account.html';a.textContent='My Account';}
+      });
+    }catch(e){}
+  }
+})();
+</script>
+</body>
+</html>

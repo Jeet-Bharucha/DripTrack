@@ -11,8 +11,9 @@
   --grey-600:#333;--grey-400:#666;--grey-200:#aaa;--white:#f0f0f0;
   --accent:#e8ff00;--accent2:#ff3c3c;--up:#39ff14;
 }
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--black);color:var(--white);font-family:'Barlow Condensed',sans-serif;min-height:100vh;display:flex;overflow:hidden;cursor:none;}
+*{margin:0;padding:0;box-sizing:border-box;cursor:none !important;}
+html,body,*,*::before,*::after{cursor:none !important;}
+body{background:var(--black);color:var(--white);font-family:'Barlow Condensed',sans-serif;min-height:100vh;display:flex;overflow:hidden;cursor:none !important;}
 
 /* CURSOR */
 .cursor{position:fixed;width:10px;height:10px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;opacity:0;transition:transform 0.1s ease;mix-blend-mode:difference;}
@@ -137,6 +138,28 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .success-desc{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--grey-400);}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:768px){
+  body{flex-direction:column;overflow-y:auto;}
+  /* Hide decorative left panel on mobile — just show the form */
+  .left-panel{display:none;}
+  .right-panel{
+    width:100%;min-height:100dvh;
+    padding:48px 24px 40px;
+    align-items:flex-start;
+  }
+  .form-wrap{max-width:100%;}
+  /* Add brand header at top since left panel is hidden */
+  .right-panel::before{
+    content:'DRIPTRACK';
+    font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:5px;
+    color:#e8ff00;display:block;margin-bottom:32px;
+  }
+}
+@media(max-width:480px){
+  .right-panel{padding:40px 20px 32px;}
+  .social-btn{font-size:12px;padding:12px 16px;}
+}
 </style>
 </head>
 <body>
@@ -206,11 +229,20 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <div class="divider"><span>or continue with</span></div>
 
       <div class="social-row">
-        <button class="social-btn" onclick="socialLogin('Google')">
-          <span>G</span> Google
+        <button class="social-btn" onclick="socialLogin('Google')" style="position:relative;overflow:hidden">
+          <svg width="16" height="16" viewBox="0 0 48 48" style="flex-shrink:0">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          Continue with Google
         </button>
         <button class="social-btn" onclick="socialLogin('Apple')">
-          <span>⌘</span> Apple
+          <svg width="14" height="16" viewBox="0 0 14 16" fill="currentColor" style="flex-shrink:0">
+            <path d="M13.33 11.27c-.27.61-.57 1.17-.9 1.7-.47.76-.86 1.28-1.16 1.57-.46.46-.96.7-1.5.71-.38 0-.85-.11-1.38-.34-.54-.23-1.03-.34-1.48-.34-.47 0-.97.11-1.52.34-.55.23-1 .35-1.35.36-.52.02-1.03-.23-1.52-.75-.33-.32-.73-.86-1.22-1.63C.75 12.06.35 11.2.08 10.2-.2 9.15-.34 8.13-.34 7.14c0-1.12.22-2.09.67-2.89.35-.62.82-1.11 1.41-1.48.59-.37 1.23-.55 1.92-.56.38 0 .88.12 1.5.36.61.24 1 .36 1.17.36.13 0 .56-.14 1.27-.43.68-.27 1.26-.38 1.73-.34 1.28.1 2.24.61 2.87 1.52-1.14.71-1.71 1.71-1.7 2.99.01 1 .35 1.83 1.01 2.48.3.3.64.53 1.01.69-.08.24-.17.47-.27.69zM10.01.32c0 .78-.27 1.51-.8 2.19-.65.81-1.44 1.27-2.29 1.2-.01-.09-.01-.18-.01-.28 0-.75.31-1.55.86-2.2.27-.33.62-.6 1.04-.82.42-.21.81-.33 1.18-.34.01.08.02.17.02.25z"/>
+          </svg>
+          Apple
         </button>
       </div>
     </div>
@@ -232,6 +264,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 </div>
 
 <script>
+(function(){var s=document.createElement('style');s.textContent='html,body,*,*::before,*::after{cursor:none!important}';document.documentElement.appendChild(s);})();
 // CURSOR
 const cursor = document.getElementById('cursor');
 const ring = document.getElementById('cursorRing');
@@ -309,8 +342,12 @@ async function handleLogin() {
   btn.disabled = true;
   btnText.textContent = 'Signing in...';
 
+  const AUTH_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? `http://${window.location.hostname}:3000/auth`
+    : `${window.location.origin}/auth`;
+
   try {
-    const res = await fetch('http://localhost:3000/auth/login', {
+    const res = await fetch(`${AUTH_BASE}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -357,8 +394,12 @@ async function forgotPassword(e) {
   link.textContent = 'Sending...';
   link.style.color = 'var(--accent)';
 
+  const _authBase2 = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? `http://${window.location.hostname}:3000/auth`
+    : `${window.location.origin}/auth`;
+
   try {
-    const res = await fetch('http://localhost:3000/auth/forgot-password', {
+    const res = await fetch(`${_authBase2}/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -395,9 +436,41 @@ async function forgotPassword(e) {
   }
 }
 
+// ─── GOOGLE OAUTH ───
 function socialLogin(provider) {
-  alert(`${provider} login coming soon! Use email/password for now.`);
+  if (provider === 'Google') {
+    // Redirect to backend Google OAuth route
+    const AUTH_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? `http://${window.location.hostname}:3000/auth`
+      : `${window.location.origin}/auth`;
+    window.location.href = `${AUTH_BASE}/google`;
+  } else if (provider === 'Apple') {
+    const err = document.getElementById('loginError');
+    err.style.color = 'var(--accent)';
+    err.style.background = 'rgba(232,255,0,0.05)';
+    err.style.borderColor = 'rgba(232,255,0,0.2)';
+    err.textContent = '🍎 Apple Sign In coming soon — use email/password for now.';
+    err.classList.add('show');
+    setTimeout(() => { err.classList.remove('show'); err.style.color=''; err.style.background=''; err.style.borderColor=''; }, 4000);
+  }
 }
+
+// Handle Google OAuth callback token in URL (after redirect back from Google)
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  const userParam = params.get('user');
+  if (token && userParam) {
+    try {
+      const user = JSON.parse(decodeURIComponent(userParam));
+      localStorage.setItem('driptrack_token', token);
+      localStorage.setItem('driptrack_user', JSON.stringify(user));
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('successMsg').classList.add('show');
+      setTimeout(() => window.location.href = 'index.html', 1500);
+    } catch {}
+  }
+})();
 
 // Enter key support
 document.addEventListener('keydown', e => {

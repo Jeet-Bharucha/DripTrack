@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>404 — DRIPTRACK</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230a0a0a'/><rect x='2' y='2' width='28' height='28' fill='none' stroke='%23e8ff00' stroke-width='1.5'/><text x='16' y='22' font-family='Arial Black,sans-serif' font-weight='900' font-size='14' fill='%23e8ff00' text-anchor='middle'>DT</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;cursor:none !important;}
+html,body{height:100%;}
+body{
+  background:#0a0a0a;
+  color:#f0f0f0;
+  font-family:'Barlow Condensed',sans-serif;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  overflow:hidden;
+  cursor:none;
+}
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:100;opacity:0.4;
+}
+/* Grid background */
+.bg-grid{
+  position:fixed;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);
+  background-size:60px 60px;
+  z-index:0;
+}
+/* Radial glow */
+.bg-glow{
+  position:fixed;inset:0;
+  background:radial-gradient(ellipse 60% 50% at 50% 50%,rgba(232,255,0,0.04) 0%,transparent 70%);
+  z-index:0;
+}
+.cursor{position:fixed;width:12px;height:12px;background:#e8ff00;border-radius:50%;pointer-events:none;z-index:9999;opacity:0;transition:transform 0.1s ease;mix-blend-mode:difference;}
+.cursor-ring{position:fixed;width:36px;height:36px;border:1px solid #e8ff00;border-radius:50%;pointer-events:none;z-index:9998;opacity:0;transition:all 0.15s ease;}
+
+.container{
+  position:relative;z-index:1;
+  text-align:center;
+  padding:48px 24px;
+  max-width:700px;
+  animation:fadeUp 0.8s ease forwards;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(40px);}to{opacity:1;transform:translateY(0);}}
+
+.error-code{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(120px,20vw,240px);
+  line-height:0.85;
+  letter-spacing:4px;
+  color:transparent;
+  -webkit-text-stroke:1px rgba(232,255,0,0.15);
+  position:relative;
+  user-select:none;
+}
+.error-code::after{
+  content:'404';
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'Bebas Neue',sans-serif;
+  color:rgba(232,255,0,0.07);
+  font-size:inherit;
+  letter-spacing:inherit;
+  animation:glitch 4s ease-in-out infinite;
+}
+@keyframes glitch{
+  0%,90%,100%{clip-path:none;transform:none;}
+  92%{clip-path:polygon(0 20%,100% 20%,100% 40%,0 40%);transform:translateX(-4px);}
+  94%{clip-path:polygon(0 60%,100% 60%,100% 80%,0 80%);transform:translateX(4px);}
+  96%{clip-path:none;transform:none;}
+}
+
+.eyebrow{
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:4px;
+  color:#e8ff00;
+  text-transform:uppercase;
+  margin-bottom:20px;
+}
+.eyebrow::before{content:'// ';opacity:0.5;}
+
+.title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(36px,6vw,64px);
+  letter-spacing:3px;
+  line-height:1;
+  margin-bottom:20px;
+}
+.title span{color:#e8ff00;}
+
+.desc{
+  font-family:'Space Mono',monospace;
+  font-size:12px;
+  letter-spacing:1px;
+  color:#666;
+  line-height:1.8;
+  margin-bottom:48px;
+  max-width:480px;
+  margin-left:auto;
+  margin-right:auto;
+}
+
+.actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+.btn-primary{
+  font-family:'Space Mono',monospace;font-size:12px;letter-spacing:2px;text-transform:uppercase;
+  color:#000;background:#e8ff00;border:none;padding:16px 32px;cursor:pointer;font-weight:700;
+  text-decoration:none;display:inline-block;transition:all 0.2s;position:relative;overflow:hidden;
+}
+.btn-primary::after{content:'';position:absolute;inset:0;background:white;transform:translateX(-101%);transition:transform 0.2s ease;}
+.btn-primary:hover::after{transform:translateX(0);}
+.btn-primary span{position:relative;z-index:1;}
+.btn-secondary{
+  font-family:'Space Mono',monospace;font-size:12px;letter-spacing:2px;text-transform:uppercase;
+  color:#f0f0f0;background:transparent;border:1px solid #333;padding:16px 32px;cursor:pointer;
+  text-decoration:none;display:inline-block;transition:all 0.2s;
+}
+.btn-secondary:hover{border-color:#e8ff00;color:#e8ff00;}
+
+.quick-links{
+  margin-top:48px;
+  padding-top:40px;
+  border-top:1px solid #1a1a1a;
+  display:flex;gap:32px;justify-content:center;flex-wrap:wrap;
+}
+.quick-link{
+  font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+  color:#444;text-decoration:none;transition:color 0.2s;
+}
+.quick-link:hover{color:#e8ff00;}
+
+.brand{
+  position:fixed;top:24px;left:48px;
+  font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:4px;
+  color:#e8ff00;text-shadow:0 0 20px rgba(232,255,0,0.4);
+  text-decoration:none;z-index:10;
+}
+.brand span{color:#f0f0f0;}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<a href="/" class="brand">DRIP<span>TRACK</span></a>
+
+<div class="container">
+  <div class="error-code">404</div>
+
+  <p class="eyebrow">Page not found</p>
+  <h1 class="title">THIS DROP <span>DOESN'T EXIST</span></h1>
+  <p class="desc">
+    The page you're looking for has been delisted, moved,<br>
+    or never existed. Maybe it sold out?
+  </p>
+
+  <div class="actions">
+    <a href="/" class="btn-primary"><span>↩ Back to Home</span></a>
+    <a href="/#search" class="btn-secondary">Search Products</a>
+  </div>
+
+  <div class="quick-links">
+    <a href="/watchlist.html" class="quick-link">❤️ My Watchlist</a>
+    <a href="/#trending" class="quick-link">🔥 Trending</a>
+    <a href="/#compare" class="quick-link">📊 Compare</a>
+    <a href="/login.html" class="quick-link">👤 Sign In</a>
+  </div>
+</div>
+
+<script>
+// Cursor
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+document.addEventListener('mousemove', e => {
+  cursor.style.opacity = '1'; ring.style.opacity = '0.5';
+  cursor.style.left = e.clientX - 6 + 'px'; cursor.style.top = e.clientY - 6 + 'px';
+  ring.style.left = e.clientX - 18 + 'px'; ring.style.top = e.clientY - 18 + 'px';
+});
+document.addEventListener('mouseleave', () => { cursor.style.opacity = '0'; ring.style.opacity = '0'; });
+document.querySelectorAll('a,button').forEach(el => {
+  el.addEventListener('mouseenter', () => { cursor.style.transform='scale(2.5)'; ring.style.transform='scale(1.5)'; });
+  el.addEventListener('mouseleave', () => { cursor.style.transform='scale(1)'; ring.style.transform='scale(1)'; });
+});
+
+// Page fade-in
+document.body.style.opacity = '0';
+document.body.style.transition = 'opacity 0.4s ease';
+requestAnimationFrame(() => requestAnimationFrame(() => { document.body.style.opacity = '1'; }));
+
+// Fade-out on nav
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href]');
+  if (!a) return;
+  const href = a.getAttribute('href');
+  if (!href || href.startsWith('#') || a.target === '_blank') return;
+  e.preventDefault();
+  document.body.style.opacity = '0';
+  setTimeout(() => { window.location.href = href; }, 300);
+});
+</script>
+</body>
+</html>

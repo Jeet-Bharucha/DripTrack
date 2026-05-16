@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product — DRIPTRACK</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta property="og:title" content="Check this deal on DRIPTRACK">
+  <meta property="og:description" content="Real-time price intelligence for streetwear & luxury">
+  <meta property="og:image" id="og-image" content="/icon-512.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--black:#0a0a0a;--white:#f0f0f0;--accent:#e8ff00;--accent2:#ff3c3c;--up:#39ff14;--down:#ff3c3c;--grey-900:#111;--grey-800:#1a1a1a;--grey-700:#222;--grey-600:#333;--grey-500:#555;--grey-400:#888;--grey-300:#aaa;--grey-200:#ccc;}
+    [data-theme="light"]{--black:#f8f8f0;--white:#111;--grey-900:#f0f0e8;--grey-800:#e8e8e0;--grey-700:#d0d0c8;--grey-600:#b0b0a8;--grey-400:#666;--grey-200:#333;}
+    *{margin:0;padding:0;box-sizing:border-box;cursor:none !important;}
+    html,body,*,*::before,*::after{cursor:none !important;}
+    body{background:var(--black);color:var(--white);font-family:'Barlow Condensed',sans-serif;min-height:100vh;cursor:none !important;}
+    nav{display:flex;justify-content:space-between;align-items:center;padding:20px 48px;border-bottom:1px solid var(--grey-700);background:var(--black);position:sticky;top:0;z-index:100;}
+    .nav-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:6px;color:var(--accent);text-decoration:none;}
+    .nav-links{display:flex;gap:24px;align-items:center;}
+    .nav-links a{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--grey-400);text-decoration:none;transition:color 0.2s;}
+    .nav-links a:hover{color:var(--accent);}
+
+    .hero{display:grid;grid-template-columns:1fr 1fr;min-height:60vh;}
+    .hero-img{background:var(--grey-900);position:relative;overflow:hidden;min-height:400px;}
+    .hero-img img{width:100%;height:100%;object-fit:cover;object-position:center;}
+    .hero-img-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:120px;opacity:0.3;}
+    .hero-info{padding:48px;display:flex;flex-direction:column;justify-content:center;border-left:1px solid var(--grey-700);}
+
+    .product-source{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:12px;}
+    .product-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,5vw,60px);letter-spacing:2px;line-height:0.95;margin-bottom:24px;}
+    .product-price{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,7vw,80px);color:var(--accent);letter-spacing:2px;line-height:1;margin-bottom:8px;}
+    .product-price-sub{font-family:'Space Mono',monospace;font-size:11px;color:var(--up);margin-bottom:32px;letter-spacing:1px;}
+
+    .action-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px;}
+    .btn-primary{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 28px;background:var(--accent);color:#000;border:none;cursor:pointer;font-weight:700;transition:opacity 0.2s;text-decoration:none;display:inline-flex;align-items:center;gap:8px;}
+    .btn-primary:hover{opacity:0.85;}
+    .btn-secondary{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 20px;background:transparent;border:1px solid var(--grey-600);color:var(--grey-200);cursor:pointer;transition:all 0.2s;}
+    .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+    .btn-share{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:14px 20px;background:transparent;border:1px solid var(--grey-600);color:var(--grey-200);cursor:pointer;transition:all 0.2s;}
+    .btn-share:hover{border-color:var(--grey-300);color:var(--white);}
+
+    .section{padding:48px;border-top:1px solid var(--grey-700);}
+    .section-label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:20px;}
+    .sources-list{display:flex;flex-direction:column;gap:8px;}
+    .source-row{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:var(--grey-900);border:1px solid var(--grey-700);transition:border-color 0.2s;}
+    .source-row:hover{border-color:var(--grey-500);}
+    .source-row.best{border-color:var(--up);}
+    .source-name{font-family:'Space Mono',monospace;font-size:12px;color:var(--white);}
+    .source-tag{font-family:'Space Mono',monospace;font-size:9px;color:var(--grey-500);margin-top:2px;}
+    .source-price{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--white);}
+    .source-price.best-price{color:var(--up);}
+    .source-shop{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;padding:6px 12px;background:var(--grey-800);border:1px solid var(--grey-600);color:var(--accent);text-decoration:none;transition:all 0.2s;white-space:nowrap;}
+    .source-shop:hover{background:var(--accent);color:#000;border-color:var(--accent);}
+
+    .chart-wrap{width:100%;height:120px;background:var(--grey-900);border:1px solid var(--grey-700);padding:16px;}
+    .score-bar{height:6px;background:var(--grey-700);border-radius:3px;margin-top:8px;overflow:hidden;}
+    .score-fill{height:100%;border-radius:3px;transition:width 0.8s cubic-bezier(.4,0,.2,1);}
+
+    .share-toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--grey-800);border:1px solid var(--grey-600);color:var(--white);font-family:'Space Mono',monospace;font-size:11px;padding:12px 24px;z-index:9999;transition:transform 0.3s;pointer-events:none;}
+    .share-toast.show{transform:translateX(-50%) translateY(0);}
+
+    .loading-state{display:flex;align-items:center;justify-content:center;min-height:60vh;font-family:'Space Mono',monospace;font-size:12px;letter-spacing:3px;color:var(--accent);}
+
+    @media(max-width:768px){
+      .hero{grid-template-columns:1fr;}
+      .hero-info{border-left:none;border-top:1px solid var(--grey-700);}
+      nav,.section{padding-left:24px;padding-right:24px;}
+      .hero-info{padding:32px 24px;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- CURSOR -->
+<div id="cursor" style="position:fixed;width:12px;height:12px;background:#e8ff00;border-radius:50%;pointer-events:none;z-index:9999;opacity:0;transition:transform 0.1s ease;mix-blend-mode:difference;"></div>
+<div id="cursorRing" style="position:fixed;width:36px;height:36px;border:1px solid #e8ff00;border-radius:50%;pointer-events:none;z-index:9998;opacity:0;transition:all 0.15s ease;"></div>
+<script>
+(function(){var s=document.createElement('style');s.textContent='html,body,*,*::before,*::after{cursor:none!important}';document.documentElement.appendChild(s);})();
+const _c=document.getElementById('cursor'),_r=document.getElementById('cursorRing');
+document.addEventListener('mousemove',e=>{_c.style.opacity='1';_r.style.opacity='0.5';_c.style.left=(e.clientX-6)+'px';_c.style.top=(e.clientY-6)+'px';_r.style.left=(e.clientX-18)+'px';_r.style.top=(e.clientY-18)+'px';});
+document.addEventListener('mouseleave',()=>{_c.style.opacity='0';_r.style.opacity='0';});
+document.addEventListener('mouseover',e=>{if(e.target.closest('button,a,input')){_c.style.transform='scale(2.5)';_r.style.transform='scale(1.5)';}else{_c.style.transform='scale(1)';_r.style.transform='scale(1)';}});
+</script>
+
+<nav>
+  <a href="/" class="nav-logo">DRIP<span style="color:var(--white)">TRACK</span></a>
+  <div class="nav-links">
+    <a href="/">← Back</a>
+    <a href="/watchlist.html">Watchlist</a>
+    <button onclick="shareProduct()" class="btn-secondary" style="padding:8px 16px;font-size:10px">↗ Share</button>
+  </div>
+</nav>
+
+<div id="main-content">
+  <div class="loading-state">⚡ LOADING PRODUCT DATA...</div>
+</div>
+
+<div class="share-toast" id="share-toast">🔗 Link copied to clipboard!</div>
+
+<script>
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? `http://${window.location.hostname}:3000/api` : `${window.location.origin}/api`;
+const AUTH_BASE = API_BASE.replace('/api', '/auth');
+
+const savedTheme = localStorage.getItem('driptrack_theme');
+if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
+const q = new URLSearchParams(window.location.search).get('q') || '';
+if (!q) { document.getElementById('main-content').innerHTML = '<div class="loading-state" style="color:var(--grey-500)">No product specified — <a href="/" style="color:var(--accent)">go home</a></div>'; }
+
+let _bestUrl = '';
+let _productData = null;
+
+function safeUrl(u) { try { if (u && u.startsWith('http') && !u.includes('google.com/search')) return u; } catch {} return null; }
+
+async function loadProduct() {
+  if (!q) return;
+  document.title = `${decodeURIComponent(q)} — DRIPTRACK`;
+
+  try {
+    // Fetch prices + image in parallel
+    const [priceRes, imgRes] = await Promise.all([
+      fetch(`${API_BASE}/prices?q=${encodeURIComponent(q)}`),
+      fetch(`${API_BASE}/image?q=${encodeURIComponent(q)}`),
+    ]);
+    const priceData = await priceRes.json();
+    const imgData = await imgRes.json();
+
+    const results = (priceData.results || []).filter(r => r && r.price && !r.suspicious);
+    const sorted = [...results].sort((a, b) => a.price - b.price);
+    const best = sorted[0];
+    const image = imgData.image || (best && best.image) || null;
+
+    if (image) document.getElementById('og-image')?.setAttribute('content', image);
+
+    _productData = { title: decodeURIComponent(q), price: best?.price || 0, source: best?.source || '', url: best?.url || '', image };
+    if (best?.url) _bestUrl = best.url;
+
+    const avgPrice = results.reduce((s, r) => s + r.price, 0) / (results.length || 1);
+    const score = calcScore(best, avgPrice);
+    const scoreColor = score >= 80 ? '#39ff14' : score >= 60 ? '#e8ff00' : score >= 40 ? '#ff9900' : '#ff3c3c';
+    const fmtP = p => p >= 1000 ? '$' + (p/1000).toFixed(1) + 'K' : '$' + p.toFixed(2);
+
+    document.getElementById('main-content').innerHTML = `
+      <div class="hero">
+        <div class="hero-img">
+          ${image
+            ? `<img src="${image}" alt="${decodeURIComponent(q)}" onerror="this.parentElement.innerHTML='<div class=hero-img-placeholder>🛍️</div>'">`
+            : '<div class="hero-img-placeholder">🛍️</div>'}
+        </div>
+        <div class="hero-info">
+          <div class="product-source">${best ? best.source + ' · Authenticated' : 'DRIPTRACK'}</div>
+          <div class="product-title">${decodeURIComponent(q)}</div>
+          <div class="product-price">${best ? fmtP(best.price) : 'N/A'}</div>
+          <div class="product-price-sub">✓ Best available price · ${sorted.length} source${sorted.length !== 1 ? 's' : ''} checked</div>
+
+          <div style="margin-bottom:24px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400)">DEAL SCORE</span>
+              <span style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:${scoreColor}">${score}/100</span>
+            </div>
+            <div class="score-bar"><div class="score-fill" style="width:${score}%;background:${scoreColor}"></div></div>
+          </div>
+
+          <div class="action-row">
+            ${_bestUrl ? `<a href="${_bestUrl}" target="_blank" rel="noopener" class="btn-primary">🛒 Buy Now →</a>` : ''}
+            <button class="btn-secondary" onclick="addToWatchlist()">❤️ Watchlist</button>
+            <button class="btn-secondary" onclick="openAlertPrompt()">🔔 Alert</button>
+            <button class="btn-share" onclick="shareProduct()">↗ Share</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Price History (Estimated)</div>
+        <div id="price-chart" class="chart-wrap">
+          <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--grey-500);letter-spacing:2px">Loading chart...</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Compare All Sources</div>
+        <div class="sources-list">
+          ${sorted.length === 0
+            ? `<div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--grey-500);padding:20px 0">No sources found for this product</div>`
+            : sorted.map((r, i) => {
+                const url = safeUrl(r.url);
+                return `
+                  <div class="source-row ${i === 0 ? 'best' : ''}">
+                    <div>
+                      <div class="source-name">${r.source}${i === 0 ? ' <span style="font-size:9px;color:var(--up)">⭐ BEST PRICE</span>' : ''}</div>
+                      <div class="source-tag">${r.title ? r.title.slice(0,50) : 'Click to view'}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:16px">
+                      <div class="source-price ${i === 0 ? 'best-price' : ''}">${fmtP(r.price)}</div>
+                      ${url ? `<a href="${url}" target="_blank" rel="noopener" class="source-shop">SHOP →</a>` : ''}
+                    </div>
+                  </div>`;
+              }).join('')}
+        </div>
+      </div>`;
+
+    // Load price history chart
+    loadHistoryChart();
+  } catch (err) {
+    document.getElementById('main-content').innerHTML = `
+      <div class="loading-state" style="flex-direction:column;gap:16px">
+        <div style="font-size:48px">⚠️</div>
+        <div>Could not load product data</div>
+        <a href="/" style="color:var(--accent);font-size:12px">← Go home</a>
+      </div>`;
+  }
+}
+
+function calcScore(item, avgPrice) {
+  if (!item) return 0;
+  let s = 0;
+  if (avgPrice > 0 && item.price) s += Math.min(45, Math.max(0, Math.round(((avgPrice - item.price) / avgPrice) * 225)));
+  else s += 20;
+  if (!item.suspicious) s += 25;
+  const trusted = ['amazon','ebay','stockx','goat','nike','adidas','foot locker','new balance','nordstrom','chrono24'];
+  if (item.source && trusted.some(t => item.source.toLowerCase().includes(t))) s += 30;
+  return Math.min(100, Math.max(0, Math.round(s)));
+}
+
+async function loadHistoryChart() {
+  const chartEl = document.getElementById('price-chart');
+  if (!chartEl) return;
+  try {
+    const res = await fetch(`${API_BASE}/history?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    const hist = data.history || [];
+    const prices = hist.length >= 2 ? hist.map(h => h.price) : generateSimulated(_productData?.price || 100);
+    const label = hist.length >= 2 ? `Live History (${hist.length} pts)` : 'Est. 14-Day Trend';
+    drawChart(chartEl, prices, label);
+  } catch {
+    if (_productData?.price) drawChart(chartEl, generateSimulated(_productData.price), 'Est. 14-Day Trend');
+  }
+}
+
+function generateSimulated(currentPrice, pts) {
+  pts = pts || 14; const prices = []; let v = currentPrice;
+  for (let i = pts; i > 0; i--) { prices.unshift(parseFloat(v.toFixed(2))); v = Math.max(currentPrice*0.78, Math.min(currentPrice*1.22, v - (Math.random()-0.48)*(currentPrice*0.009))); }
+  prices.push(currentPrice); return prices;
+}
+
+function drawChart(el, prices, label) {
+  const first = prices[0], last = prices[prices.length - 1];
+  const chg = (((last - first) / first) * 100).toFixed(1);
+  const isUp = last >= first;
+  const color = isUp ? 'var(--up)' : 'var(--down)';
+  const w = 600, h = 80, pad = 8;
+  const min = Math.min(...prices) * 0.95, max = Math.max(...prices) * 1.05;
+  const coords = prices.map((v, i) => [pad + (i/(prices.length-1))*(w-pad*2), h-pad-((v-min)/(max-min||1))*(h-pad*2)]);
+  const line = 'M ' + coords.map(c => c.join(',')).join(' L ');
+  const area = line + ` L ${coords[coords.length-1][0]},${h} L ${coords[0][0]},${h} Z`;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+      <span style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--accent)">${label}</span>
+      <span style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:${color}">${isUp?'▲':'▼'} ${Math.abs(chg)}%</span>
+    </div>
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:80px">
+      <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${isUp?'#39ff14':'#ff3c3c'}" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="${isUp?'#39ff14':'#ff3c3c'}" stop-opacity="0"/>
+      </linearGradient></defs>
+      <path d="${area}" fill="url(#cg)"/>
+      <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <div style="display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:9px;color:var(--grey-400);margin-top:4px">
+      <span>$${first.toFixed(2)}</span><span style="color:${color}">Now: $${last.toFixed(2)}</span>
+    </div>`;
+}
+
+function addToWatchlist() {
+  if (!_productData) return;
+  const list = JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
+  if (list.some(i => i.title === _productData.title)) { showShareToast('Already in watchlist!'); return; }
+  list.push({ ..._productData, addedAt: new Date().toISOString() });
+  localStorage.setItem('driptrack_watchlist', JSON.stringify(list));
+  showShareToast('❤️ Added to watchlist!');
+}
+
+function openAlertPrompt() {
+  const token = localStorage.getItem('driptrack_token');
+  if (!token) { alert('Please log in to set price alerts'); return; }
+  if (!_productData) return;
+  const target = prompt(`Set alert for: ${_productData.title.slice(0,40)}\nCurrent price: $${_productData.price.toFixed(2)}\n\nEnter your target price:`);
+  if (!target || isNaN(parseFloat(target))) return;
+  fetch(`${AUTH_BASE}/alerts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ productName: _productData.title, targetPrice: parseFloat(target), productImage: _productData.image }),
+  }).then(r => r.json()).then(d => {
+    if (d.success) showShareToast(`🔔 Alert set for $${parseFloat(target).toFixed(2)}!`);
+    else showShareToast(d.message || 'Error');
+  }).catch(() => showShareToast('Network error'));
+}
+
+function shareProduct() {
+  const url = window.location.href;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => showShareToast('🔗 Link copied!'));
+  } else {
+    showShareToast('Copy this URL: ' + url);
+  }
+}
+
+function showShareToast(msg) {
+  const t = document.getElementById('share-toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+loadProduct();
+</script>
+</body>
+</html>

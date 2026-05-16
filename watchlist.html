@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Watchlist — DRIPTRACK</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black:#0a0a0a; --white:#f0f0f0; --accent:#e8ff00; --accent2:#ff3c3c;
+      --up:#39ff14; --down:#ff3c3c;
+      --grey-900:#111; --grey-800:#1a1a1a; --grey-700:#222; --grey-600:#333;
+      --grey-500:#555; --grey-400:#888; --grey-300:#aaa; --grey-200:#ccc;
+    }
+    [data-theme="light"] {
+      --black:#f8f8f0; --white:#111; --grey-900:#f0f0e8; --grey-800:#e8e8e0;
+      --grey-700:#d0d0c8; --grey-600:#b0b0a8; --grey-500:#888; --grey-400:#666;
+      --grey-300:#444; --grey-200:#333;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;cursor:none !important;}
+    html,body,*,*::before,*::after{cursor:none !important;}
+    body{background:var(--black);color:var(--white);font-family:'Barlow Condensed',sans-serif;min-height:100vh;cursor:none !important;}
+
+    /* NAV */
+    nav{display:flex;justify-content:space-between;align-items:center;padding:20px 48px;border-bottom:1px solid var(--grey-700);background:var(--black);position:sticky;top:0;z-index:100;}
+    .nav-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:6px;color:var(--accent);text-decoration:none;}
+    .nav-links{display:flex;gap:32px;align-items:center;}
+    .nav-links a{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--grey-400);text-decoration:none;transition:color 0.2s;}
+    .nav-links a:hover,.nav-links a.active{color:var(--accent);}
+
+    /* PAGE HEADER */
+    .page-header{padding:60px 48px 40px;border-bottom:1px solid var(--grey-700);}
+    .page-eyebrow{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:12px;}
+    .page-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,8vw,96px);letter-spacing:4px;line-height:0.9;margin-bottom:16px;}
+    .page-sub{font-family:'Space Mono',monospace;font-size:11px;color:var(--grey-400);letter-spacing:1px;}
+
+    /* TABS */
+    .tab-row{display:flex;gap:4px;padding:32px 48px 0;border-bottom:1px solid var(--grey-700);}
+    .tab-btn{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;
+             padding:12px 24px;background:none;border:none;border-bottom:2px solid transparent;
+             color:var(--grey-400);cursor:pointer;transition:all 0.2s;}
+    .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+    .tab-btn:hover{color:var(--white);}
+
+    /* CONTENT */
+    .content{padding:40px 48px;min-height:60vh;}
+
+    /* WATCHLIST GRID */
+    .wl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+    .wl-card{background:var(--grey-900);border:1px solid var(--grey-700);display:flex;gap:0;overflow:hidden;transition:border-color 0.2s;}
+    .wl-card:hover{border-color:var(--grey-500);}
+    .wl-card-img{width:100px;min-width:100px;background:var(--grey-800);position:relative;overflow:hidden;}
+    .wl-card-img img{width:100%;height:100%;object-fit:cover;}
+    .wl-card-img-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;}
+    .wl-card-body{flex:1;padding:16px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
+    .wl-card-source{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400);text-transform:uppercase;margin-bottom:4px;}
+    .wl-card-name{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;line-height:1.1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .wl-card-price{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:var(--accent);}
+    .wl-card-change{font-family:'Space Mono',monospace;font-size:9px;margin-top:4px;}
+    .wl-card-actions{display:flex;gap:6px;margin-top:12px;}
+    .wl-btn{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;
+            padding:6px 10px;background:transparent;border:1px solid var(--grey-600);color:var(--grey-300);
+            cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+    .wl-btn:hover{border-color:var(--accent);color:var(--accent);}
+    .wl-btn.danger:hover{border-color:var(--accent2);color:var(--accent2);}
+
+    /* ALERTS */
+    .alerts-list{display:flex;flex-direction:column;gap:12px;}
+    .alert-row{background:var(--grey-900);border:1px solid var(--grey-700);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+    .alert-name{font-family:'Space Mono',monospace;font-size:12px;color:var(--white);}
+    .alert-target{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);}
+    .alert-status{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;padding:4px 8px;border:1px solid;text-transform:uppercase;}
+
+    /* EMPTY STATE */
+    .empty{text-align:center;padding:80px 40px;}
+    .empty-icon{font-size:64px;margin-bottom:24px;opacity:0.4;}
+    .empty-title{font-family:'Bebas Neue',sans-serif;font-size:48px;letter-spacing:4px;color:var(--grey-600);margin-bottom:12px;}
+    .empty-sub{font-family:'Space Mono',monospace;font-size:11px;color:var(--grey-500);margin-bottom:32px;}
+    .empty-cta{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;
+               padding:14px 32px;background:var(--accent);color:var(--black);border:none;cursor:pointer;font-weight:700;text-decoration:none;display:inline-block;}
+
+    /* LIVE PRICE BADGE */
+    .live-dot{display:inline-block;width:6px;height:6px;background:var(--up);border-radius:50%;margin-right:4px;animation:pulse 1.5s infinite;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+    @media(max-width:768px){
+      nav{padding:12px 16px !important;}
+      .page-header{padding:40px 16px 24px !important;}
+      .tab-row{padding:0 16px !important;}
+      .content{padding:24px 16px !important;}
+      .wl-grid{grid-template-columns:1fr;}
+      .page-title{font-size:clamp(36px,10vw,64px) !important;}
+      /* Nav links on mobile */
+      .nav-links{gap:12px;}
+      .nav-links a{font-size:9px;letter-spacing:1px;}
+    }
+    @media(max-width:480px){
+      .nav-links{display:none;}
+      .wl-card-img{width:80px;min-width:80px;}
+      .wl-card-body{padding:12px;}
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">DRIP<span style="color:var(--white)">TRACK</span></a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/watchlist.html" class="active">Watchlist</a>
+    <a href="/account.html" id="nav-account">Account</a>
+    <button onclick="toggleTheme()" style="background:none;border:1px solid var(--grey-600);color:var(--grey-300);font-family:'Space Mono',monospace;font-size:10px;padding:8px 14px;cursor:pointer;letter-spacing:1px">
+      ◐ THEME
+    </button>
+  </div>
+</nav>
+
+<div class="page-header">
+  <p class="page-eyebrow">// Your Tracked Items</p>
+  <div class="page-title">MY <span style="color:var(--accent)">WATCHLIST</span></div>
+  <p class="page-sub" id="wl-summary">Loading your watchlist...</p>
+</div>
+
+<div class="tab-row">
+  <button class="tab-btn active" onclick="showTab('watchlist',this)">❤️ Saved Items</button>
+  <button class="tab-btn" onclick="showTab('alerts',this)">🔔 Price Alerts</button>
+</div>
+
+<div class="content">
+  <!-- WATCHLIST TAB -->
+  <div id="tab-watchlist">
+    <div id="wl-grid" class="wl-grid">
+      <div style="grid-column:1/-1">
+        <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--grey-400);padding:40px 0;text-align:center;letter-spacing:2px">
+          ⚡ Loading your watchlist...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALERTS TAB -->
+  <div id="tab-alerts" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+      <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--grey-400);letter-spacing:2px">
+        Alerts trigger an email + push notification when price hits your target
+      </div>
+      <button onclick="window.location='/'" style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:10px 20px;background:var(--accent);color:var(--black);border:none;cursor:pointer;font-weight:700">
+        + New Alert
+      </button>
+    </div>
+    <div id="alerts-list" class="alerts-list">
+      <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--grey-400);padding:40px 0;text-align:center;letter-spacing:2px">
+        ⚡ Loading alerts...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){var s=document.createElement('style');s.textContent='html,body,*,*::before,*::after{cursor:none!important}';document.documentElement.appendChild(s);})();
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? `http://${window.location.hostname}:3000/api` : `${window.location.origin}/api`;
+const AUTH_BASE = API_BASE.replace('/api', '/auth');
+
+// ── THEME ──────────────────────────────────────
+function toggleTheme() {
+  const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('driptrack_theme', t);
+}
+const saved = localStorage.getItem('driptrack_theme');
+if (saved) document.documentElement.setAttribute('data-theme', saved);
+
+// ── AUTH CHECK ─────────────────────────────────
+const token = localStorage.getItem('driptrack_token');
+const userData = JSON.parse(localStorage.getItem('driptrack_user') || 'null');
+if (userData) document.getElementById('nav-account').textContent = userData.firstName || 'Account';
+
+// ── TABS ───────────────────────────────────────
+function showTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-watchlist').style.display = tab === 'watchlist' ? 'block' : 'none';
+  document.getElementById('tab-alerts').style.display = tab === 'alerts' ? 'block' : 'none';
+}
+
+// ── LOAD WATCHLIST ─────────────────────────────
+async function loadWatchlist() {
+  // Always load from localStorage first (immediate)
+  const local = JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
+  renderWatchlist(local);
+
+  // If logged in, merge with server watchlist
+  if (token) {
+    try {
+      const res = await fetch(`${AUTH_BASE}/watchlist`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      // Server watchlist is array of product name strings; local has full objects
+      // Show local objects (richer data) plus any server-only names
+      renderWatchlist(local);
+    } catch {}
+  }
+
+  // Update summary
+  const count = local.length;
+  document.getElementById('wl-summary').textContent =
+    count === 0 ? 'No items saved yet' : `${count} item${count !== 1 ? 's' : ''} tracked${token ? ' · Synced to account' : ' · Log in to sync'}`;
+
+  // Fetch live prices for each item in background
+  fetchLivePrices(local);
+}
+
+function renderWatchlist(items) {
+  const grid = document.getElementById('wl-grid');
+  if (!items.length) {
+    grid.innerHTML = `
+      <div class="empty" style="grid-column:1/-1">
+        <div class="empty-icon">❤️</div>
+        <div class="empty-title">NOTHING SAVED YET</div>
+        <div class="empty-sub">Search for a product and click the watchlist button to start tracking</div>
+        <a href="/" class="empty-cta">Start Exploring →</a>
+      </div>`;
+    return;
+  }
+  grid.innerHTML = items.map((item, i) => {
+    const price = item.price >= 1000 ? '$' + (item.price/1000).toFixed(1) + 'K' : '$' + parseFloat(item.price || 0).toFixed(2);
+    const addedDate = item.addedAt ? new Date(item.addedAt).toLocaleDateString('en-US', {month:'short',day:'numeric'}) : 'Recently';
+    return `
+      <div class="wl-card" id="wl-card-${i}">
+        <div class="wl-card-img">
+          ${item.image
+            ? `<img src="${item.image}" alt="${item.title}" onerror="this.parentElement.innerHTML='<div class=wl-card-img-placeholder>🛍️</div>'">`
+            : '<div class="wl-card-img-placeholder">🛍️</div>'}
+        </div>
+        <div class="wl-card-body">
+          <div>
+            <div class="wl-card-source">${item.source || 'Unknown'}</div>
+            <div class="wl-card-name">${(item.title || 'Product').slice(0, 40)}</div>
+            <div class="wl-card-price" id="wl-price-${i}">${price}</div>
+            <div class="wl-card-change" id="wl-change-${i}" style="color:var(--grey-500)">
+              <span class="live-dot"></span> Fetching live price...
+            </div>
+            <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--grey-600);margin-top:2px">Added ${addedDate}</div>
+          </div>
+          <div class="wl-card-actions">
+            <button class="wl-btn" onclick="searchItem('${(item.title||'').replace(/'/g,"\\'")}')">Search →</button>
+            <button class="wl-btn" onclick="setAlertForItem(${i})">🔔 Alert</button>
+            <button class="wl-btn danger" onclick="removeItem(${i})">✕</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function fetchLivePrices(items) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const priceEl = document.getElementById(`wl-price-${i}`);
+    const changeEl = document.getElementById(`wl-change-${i}`);
+    if (!priceEl || !changeEl) continue;
+    try {
+      const res = await fetch(`${API_BASE}/prices?q=${encodeURIComponent(item.title || '')}`);
+      const data = await res.json();
+      const results = (data.results || []).filter(r => r && r.price && !r.suspicious);
+      if (results.length) {
+        const best = results.sort((a, b) => a.price - b.price)[0];
+        const livePrice = best.price >= 1000 ? '$' + (best.price/1000).toFixed(1) + 'K' : '$' + best.price.toFixed(2);
+        priceEl.innerHTML = livePrice;
+        priceEl.style.color = 'var(--up)';
+
+        const saved = parseFloat(item.price || 0);
+        if (saved > 0) {
+          const diff = best.price - saved;
+          const pct = ((diff / saved) * 100).toFixed(1);
+          const isUp = diff > 0;
+          changeEl.innerHTML = `<span class="live-dot"></span> ${isUp ? '▲' : '▼'} ${Math.abs(pct)}% since saved · Best: ${best.source}`;
+          changeEl.style.color = isUp ? 'var(--down)' : 'var(--up)';
+        } else {
+          changeEl.innerHTML = `<span class="live-dot"></span> Live · Best: ${best.source}`;
+          changeEl.style.color = 'var(--up)';
+        }
+      } else {
+        changeEl.textContent = 'No live price found';
+        changeEl.style.color = 'var(--grey-500)';
+      }
+    } catch {
+      changeEl.textContent = 'Could not fetch price';
+      changeEl.style.color = 'var(--grey-600)';
+    }
+  }
+}
+
+// ── WATCHLIST ACTIONS ──────────────────────────
+function searchItem(title) {
+  window.location.href = `/?q=${encodeURIComponent(title)}`;
+}
+
+const _wlItems = () => JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
+
+function removeItem(i) {
+  if (!confirm('Remove this item from your watchlist?')) return;
+  const items = _wlItems();
+  items.splice(i, 1);
+  localStorage.setItem('driptrack_watchlist', JSON.stringify(items));
+  // Also remove from server
+  if (token) {
+    fetch(`${AUTH_BASE}/watchlist/${i}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+  }
+  loadWatchlist();
+}
+
+function setAlertForItem(i) {
+  const items = _wlItems();
+  const item = items[i];
+  if (!item) return;
+  if (!token) { alert('Please log in to set price alerts'); return; }
+  const target = prompt(`Set alert price for "${(item.title||'').slice(0,40)}":\nCurrent tracked price: $${parseFloat(item.price||0).toFixed(2)}\n\nEnter target price (e.g. ${(parseFloat(item.price||100)*0.9).toFixed(2)}):`);
+  if (!target || isNaN(parseFloat(target))) return;
+  fetch(`${AUTH_BASE}/alerts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ productName: item.title, targetPrice: parseFloat(target), productImage: item.image }),
+  }).then(r => r.json()).then(d => {
+    if (d.success) { alert(`Alert set! We'll notify you when ${(item.title||'').slice(0,30)} drops to $${parseFloat(target).toFixed(2)}`); loadAlerts(); }
+    else alert(d.message || 'Could not set alert');
+  }).catch(() => alert('Network error'));
+}
+
+// ── LOAD ALERTS ────────────────────────────────
+async function loadAlerts() {
+  const list = document.getElementById('alerts-list');
+  if (!token) {
+    list.innerHTML = `<div class="empty">
+      <div class="empty-icon">🔔</div>
+      <div class="empty-title">LOG IN TO SEE ALERTS</div>
+      <div class="empty-sub">Price alerts require an account</div>
+      <a href="/login.html" class="empty-cta">Log In →</a>
+    </div>`;
+    return;
+  }
+  try {
+    const res = await fetch(`${AUTH_BASE}/alerts`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    const alerts = Object.entries(data.alerts || {});
+    if (!alerts.length) {
+      list.innerHTML = `<div class="empty">
+        <div class="empty-icon">🔔</div>
+        <div class="empty-title">NO ALERTS SET</div>
+        <div class="empty-sub">Open any product and click "Set Alert" to get notified when the price drops</div>
+        <a href="/" class="empty-cta">Browse Products →</a>
+      </div>`;
+      return;
+    }
+    list.innerHTML = alerts.map(([key, a]) => {
+      const fmt = p => p >= 1000 ? '$' + (p/1000).toFixed(1) + 'K' : '$' + parseFloat(p).toFixed(2);
+      return `
+        <div class="alert-row">
+          <div style="flex:1;min-width:0">
+            <div class="alert-name" style="margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.productName}</div>
+            <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--grey-500)">
+              Alert when price ≤
+            </div>
+          </div>
+          <div style="text-align:center">
+            <div class="alert-target">${fmt(a.targetPrice)}</div>
+            <div class="alert-status" style="color:${a.enabled ? 'var(--up)' : 'var(--grey-500)'};border-color:${a.enabled ? 'var(--up)' : 'var(--grey-600)'}">
+              ${a.enabled ? '● ACTIVE' : '○ PAUSED'}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="wl-btn" onclick="toggleAlert('${key}', ${!a.enabled})">${a.enabled ? 'Pause' : 'Resume'}</button>
+            <button class="wl-btn danger" onclick="deleteAlert('${key}')">✕</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch {
+    list.innerHTML = `<div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--grey-500);padding:40px 0;text-align:center">Could not load alerts</div>`;
+  }
+}
+
+async function deleteAlert(key) {
+  if (!confirm('Delete this price alert?')) return;
+  try {
+    await fetch(`${AUTH_BASE}/alerts/${key}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    loadAlerts();
+  } catch {}
+}
+
+async function toggleAlert(key, enabled) {
+  try {
+    const res = await fetch(`${AUTH_BASE}/alerts`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (data.alerts[key]) {
+      data.alerts[key].enabled = enabled;
+      await fetch(`${AUTH_BASE}/price-alerts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ alerts: data.alerts }),
+      });
+      loadAlerts();
+    }
+  } catch {}
+}
+
+// ── INIT ───────────────────────────────────────
+loadWatchlist();
+loadAlerts();
+
+// Handle ?q= redirect from share links
+const urlQ = new URLSearchParams(window.location.search).get('q');
+if (urlQ) window.location.href = `/?q=${encodeURIComponent(urlQ)}`;
+</script>
+
+<!-- MOBILE BOTTOM NAV -->
+<style>
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:600;background:rgba(10,10,10,0.97);border-top:1px solid #222;backdrop-filter:blur(12px);padding:8px 0 env(safe-area-inset-bottom,8px);}
+.bottom-nav-items{display:flex;justify-content:space-around;align-items:center;}
+.bottom-nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 12px;background:none;border:none;font-family:'Space Mono',monospace;font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#888;cursor:pointer;transition:color 0.2s;text-decoration:none;position:relative;min-width:56px;}
+.bottom-nav-item .bnav-icon{font-size:20px;line-height:1;}
+.bottom-nav-item.active,.bottom-nav-item:hover{color:#e8ff00;}
+@media(max-width:768px){.bottom-nav{display:block;}body{padding-bottom:72px;}}
+</style>
+<nav class="bottom-nav">
+  <div class="bottom-nav-items">
+    <a class="bottom-nav-item" href="/">
+      <span class="bnav-icon">🏠</span><span>Home</span>
+    </a>
+    <a class="bottom-nav-item" href="/?focus=search">
+      <span class="bnav-icon">🔍</span><span>Search</span>
+    </a>
+    <a class="bottom-nav-item active" href="watchlist.html">
+      <span class="bnav-icon">❤️</span><span>Watchlist</span>
+    </a>
+    <a class="bottom-nav-item" href="account.html">
+      <span class="bnav-icon">🔔</span><span>Alerts</span>
+    </a>
+    <a class="bottom-nav-item" id="bnavAccountBtn" href="login.html">
+      <span class="bnav-icon">👤</span><span id="bnavAccountLabel">Sign In</span>
+    </a>
+  </div>
+</nav>
+<script>
+(function(){const t=localStorage.getItem('driptrack_token'),u=localStorage.getItem('driptrack_user');
+if(t&&u){try{const p=JSON.parse(u);const b=document.getElementById('bnavAccountBtn');const l=document.getElementById('bnavAccountLabel');if(b)b.href='account.html';if(l)l.textContent=p.firstName||'Account';}catch(e){}}})();
+</script>
+</body>
+</html>
