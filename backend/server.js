@@ -16,6 +16,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..')));
 
+// ── LANDING PAGE as root
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'landing.html'));
+});
+// ── APP lives at /app
+app.get('/app', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
+
 // ─────────────────────────────────────────────
 // MONGODB CONNECTION
 // ─────────────────────────────────────────────
@@ -33,7 +42,8 @@ const userSchema = new mongoose.Schema({
   firstName:        { type: String, required: true, trim: true },
   lastName:         { type: String, required: true, trim: true },
   email:            { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password:         { type: String, required: true },
+  password:         { type: String, required: false },   // optional — Google users have no password
+  googleId:         { type: String, default: null },     // Google OAuth subject ID
   verified:         { type: Boolean, default: false },
   verifyToken:      { type: String },
   resetToken:       { type: String },
@@ -348,6 +358,101 @@ app.post('/auth/reset-password', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
+// GOOGLE OAUTH 2.0
+// Redirect flow — no Passport needed
+// ─────────────────────────────────────────────
+const GOOGLE_REDIRECT_URI = `http://localhost:${PORT}/auth/google/callback`;
+
+app.get('/auth/google', (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.redirect('/login.html?error=google_not_configured');
+  }
+  const params = new URLSearchParams({
+    client_id:     process.env.GOOGLE_CLIENT_ID,
+    redirect_uri:  GOOGLE_REDIRECT_URI,
+    response_type: 'code',
+    scope:         'openid email profile',
+    access_type:   'offline',
+    prompt:        'select_account',
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error || !code) return res.redirect('/login.html?error=google_cancelled');
+
+  try {
+    // 1. Exchange code → access token
+    const tokenRes = await axios.post('https://oauth2.googleapis.com/token', {
+      code,
+      client_id:     process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri:  GOOGLE_REDIRECT_URI,
+      grant_type:    'authorization_code',
+    });
+    const { access_token } = tokenRes.data;
+
+    // 2. Fetch Google profile
+    const profileRes = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const { sub: googleId, email, given_name, family_name, picture } = profileRes.data;
+    if (!email) return res.redirect('/login.html?error=google_no_email');
+
+    // 3. Find existing user by googleId OR email
+    let user = await User.findOne({ $or: [{ googleId }, { email: email.toLowerCase() }] });
+
+    if (!user) {
+      // Brand new user — create account (Google already verified the email)
+      const crypto = require('crypto');
+      user = new User({
+        firstName: given_name  || 'Google',
+        lastName:  family_name || 'User',
+        email:     email.toLowerCase(),
+        password:  await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
+        googleId,
+        avatar:    picture || '',
+        verified:  true,
+      });
+      await user.save();
+      console.log(`✅ New Google user: ${email}`);
+    } else if (!user.googleId) {
+      // Existing email/password user — link their Google account
+      user.googleId = googleId;
+      if (picture && !user.avatar) user.avatar = picture;
+      user.verified = true;
+      await user.save();
+      console.log(`✅ Google linked to existing account: ${email}`);
+    }
+
+    // 4. Issue JWT (same 7-day token as normal login)
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    const userData = encodeURIComponent(JSON.stringify({
+      id:        user._id,
+      firstName: user.firstName,
+      lastName:  user.lastName,
+      email:     user.email,
+      verified:  user.verified,
+      avatar:    user.avatar,
+      createdAt: user.createdAt,
+    }));
+
+    // 5. Redirect to frontend — login.html reads ?token= and ?user= from URL
+    res.redirect(`/login.html?token=${token}&user=${userData}`);
+
+  } catch (err) {
+    console.error('Google OAuth error:', err.response?.data || err.message);
+    res.redirect('/login.html?error=google_failed');
+  }
+});
+
 // WATCHLIST — add product
 app.post('/auth/watchlist', authMiddleware, async (req, res) => {
   const { product } = req.body;
@@ -398,13 +503,37 @@ app.delete('/auth/account', authMiddleware, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// PRICE HISTORY
+// PRICE HISTORY — persisted in MongoDB
 // ─────────────────────────────────────────────
-const priceHistory = {};
-function savePriceHistory(id, price) {
-  if (!priceHistory[id]) priceHistory[id] = [];
-  priceHistory[id].push({ price, timestamp: Date.now() });
-  if (priceHistory[id].length > 90) priceHistory[id].shift();
+const priceHistorySchema = new mongoose.Schema({
+  productId: { type: String, required: true, index: true },
+  price:     { type: Number, required: true },
+  source:    { type: String },
+  timestamp: { type: Date, default: Date.now },
+});
+const PriceHistory = mongoose.model('PriceHistory', priceHistorySchema);
+
+// In-memory fallback when MongoDB is not connected
+const priceHistoryCache = {};
+
+async function savePriceHistory(id, price, source) {
+  // Always save to in-memory cache
+  if (!priceHistoryCache[id]) priceHistoryCache[id] = [];
+  priceHistoryCache[id].push({ price, source, timestamp: Date.now() });
+  if (priceHistoryCache[id].length > 90) priceHistoryCache[id].shift();
+
+  // Also persist to MongoDB if connected
+  if (mongoose.connection.readyState === 1) {
+    try {
+      await PriceHistory.create({ productId: id, price, source });
+      // Keep only last 90 data points per product
+      const count = await PriceHistory.countDocuments({ productId: id });
+      if (count > 90) {
+        const oldest = await PriceHistory.find({ productId: id }).sort({ timestamp: 1 }).limit(count - 90);
+        await PriceHistory.deleteMany({ _id: { $in: oldest.map(d => d._id) } });
+      }
+    } catch (err) { /* fall back to in-memory only */ }
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -582,17 +711,34 @@ app.get('/api/prices', async (req, res) => {
   const combined = [amazon, ebay, ...googleResults].filter(Boolean);
   const deduped = deduplicateBySource(combined);
   const checked = authenticityCheck(deduped);
-  const lowestPrice = checked.filter(p=>!p.suspicious&&p.price).sort((a,b)=>a.price-b.price)[0];
-  if (lowestPrice) savePriceHistory(q.toLowerCase().replace(/\s+/g,'-'), lowestPrice.price);
-  console.log(`✅ ${checked.length} results`);
-  res.json({ query:q, timestamp:new Date().toISOString(), results:checked, bestPrice:lowestPrice||null, totalSources:checked.length });
+
+  // Find best quality image: Amazon > eBay > SerpAPI (in that order)
+  const bestImage = amazon?.image || ebay?.image || googleResults.find(r => r?.image)?.image || null;
+
+  // Apply best image to any result that has no image
+  const enriched = checked.map(r => ({
+    ...r,
+    image: (r.image && r.image.startsWith('http')) ? r.image : bestImage,
+  }));
+
+  const lowestPrice = enriched.filter(p=>!p.suspicious&&p.price).sort((a,b)=>a.price-b.price)[0];
+  if (lowestPrice) savePriceHistory(q.toLowerCase().replace(/\s+/g,'-'), lowestPrice.price, lowestPrice.source);
+  console.log(`✅ ${enriched.length} results`);
+  res.json({ query:q, timestamp:new Date().toISOString(), results:enriched, bestPrice:lowestPrice||null, totalSources:enriched.length });
 });
 
-app.get('/api/history', (req, res) => {
+app.get('/api/history', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: 'Missing ?q=' });
-  const id = q.toLowerCase().replace(/\s+/g,'-');
-  res.json({ productId:id, history:priceHistory[id]||[], dataPoints:(priceHistory[id]||[]).length });
+  const id = q.toLowerCase().replace(/\s+/g, '-');
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const history = await PriceHistory.find({ productId: id }).sort({ timestamp: 1 }).limit(90);
+      return res.json({ productId: id, history, dataPoints: history.length });
+    }
+  } catch (err) { /* fall back to in-memory */ }
+  const fallback = priceHistoryCache[id] || [];
+  res.json({ productId: id, history: fallback, dataPoints: fallback.length });
 });
 
 app.get('/api/status', (req, res) => {
@@ -610,12 +756,20 @@ app.get('/api/image', async (req, res) => {
   if (!q) return res.status(400).json({ error: 'Missing ?q=' });
   try {
     if (process.env.SERPAPI_KEY) {
-      const r = await axios.get('https://serpapi.com/search', { params:{engine:'google_shopping',q,api_key:process.env.SERPAPI_KEY,num:5}, timeout:6000 });
-      const item = (r.data.shopping_results||[]).find(x=>x.thumbnail&&!isJunkListing(x.title)&&!isKidsProduct(x.title));
-      if (item?.thumbnail) return res.json({ image:item.thumbnail });
+      // Use google_images engine for full-size images instead of tiny shopping thumbnails
+      const r = await axios.get('https://serpapi.com/search', {
+        params: { engine: 'google_images', q, api_key: process.env.SERPAPI_KEY, num: 5 },
+        timeout: 6000,
+      });
+      const item = (r.data.images_results || []).find(x =>
+        x.original && !isJunkListing(x.title) && !isKidsProduct(x.title)
+      );
+      if (item?.original) return res.json({ image: item.original });
+      // Fallback to thumbnail if original not available
+      if (item?.thumbnail) return res.json({ image: item.thumbnail });
     }
-    res.json({ image:null });
-  } catch { res.json({ image:null }); }
+    res.json({ image: null });
+  } catch { res.json({ image: null }); }
 });
 
 app.get('/api/angles', async (req, res) => {
@@ -624,18 +778,29 @@ app.get('/api/angles', async (req, res) => {
   const angles = [];
   try {
     if (process.env.SERPAPI_KEY) {
-      const queries = [q, `${q} side view`, `${q} back view`, `${q} detail`];
-      const results = await Promise.all(queries.map(query =>
-        axios.get('https://serpapi.com/search', { params:{engine:'google_shopping',q:query,api_key:process.env.SERPAPI_KEY,num:5}, timeout:6000 }).catch(()=>null)
+      // Only fetch Side, Back, Detail — Front is always the card's own image (handled client-side)
+      const angleQueries = [
+        { label: 'Side',   query: `${q} side view` },
+        { label: 'Back',   query: `${q} back view` },
+        { label: 'Detail', query: `${q} detail shot` },
+      ];
+      const results = await Promise.all(angleQueries.map(({ query }) =>
+        axios.get('https://serpapi.com/search', {
+          params: { engine: 'google_images', q: query, api_key: process.env.SERPAPI_KEY, num: 5 },
+          timeout: 6000,
+        }).catch(() => null)
       ));
-      results.forEach((r,i) => {
+      results.forEach((r, i) => {
         if (!r) return;
-        const item = (r.data.shopping_results||[]).find(x=>x.thumbnail&&!isJunkListing(x.title));
-        if (item?.thumbnail) angles.push({ url:item.thumbnail, label:['Front','Side','Back','Detail'][i] });
+        const items = r.data.images_results || [];
+        // Prefer original full-size image, fall back to thumbnail
+        const item = items.find(x => (x.original || x.thumbnail) && !isJunkListing(x.title));
+        const url = item?.original || item?.thumbnail;
+        if (url) angles.push({ url, label: angleQueries[i].label });
       });
     }
-    res.json({ query:q, angles, total:angles.length });
-  } catch { res.json({ query:q, angles:[], total:0 }); }
+    res.json({ query: q, angles, total: angles.length });
+  } catch { res.json({ query: q, angles: [], total: 0 }); }
 });
 
 // ─────────────────────────────────────────────
@@ -659,6 +824,13 @@ async function checkPriceAlerts() {
           if (best.price <= alertData.targetPrice) {
             console.log(`📉 Price drop! ${alertData.productName} now $${best.price} (target: $${alertData.targetPrice}) — alerting ${user.email}`);
             await sendPriceDropEmail(user.email, user.firstName, alertData.productName, best.price, alertData.targetPrice, best.url, best.source);
+            // Also send push notification
+            await sendPushToUser(user._id, {
+              title: '📉 Price Drop Alert — DripTrack',
+              body: `${alertData.productName} is now $${best.price.toFixed(2)} on ${best.source} (your target: $${parseFloat(alertData.targetPrice).toFixed(2)})`,
+              url: best.url || '/',
+              icon: '/icon-192.png',
+            });
           }
         } catch (err) { /* skip this item */ }
       }
@@ -704,6 +876,252 @@ app.post('/auth/price-alerts', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
 });
 
+// ─────────────────────────────────────────────
+// PRICE ALERTS — per-product CRUD
+// ─────────────────────────────────────────────
+app.post('/auth/alerts', authMiddleware, async (req, res) => {
+  const { productName, targetPrice, productImage } = req.body;
+  if (!productName || targetPrice == null) return res.status(400).json({ message: 'productName and targetPrice required' });
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.priceAlerts) user.priceAlerts = {};
+    const key = productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60);
+    user.priceAlerts[key] = { productName, targetPrice: parseFloat(targetPrice), productImage: productImage || null, enabled: true, createdAt: new Date() };
+    user.markModified('priceAlerts');
+    await user.save();
+    res.json({ success: true, key });
+  } catch (err) { res.status(500).json({ message: 'Server error' }); }
+});
+
+app.get('/auth/alerts', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('priceAlerts');
+    res.json({ alerts: user?.priceAlerts || {} });
+  } catch { res.status(500).json({ message: 'Server error' }); }
+});
+
+app.delete('/auth/alerts/:key', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.priceAlerts) { delete user.priceAlerts[req.params.key]; user.markModified('priceAlerts'); }
+    await user.save();
+    res.json({ success: true });
+  } catch { res.status(500).json({ message: 'Server error' }); }
+});
+
+// ─────────────────────────────────────────────
+// WEB PUSH NOTIFICATIONS
+// Run: npm install web-push  (in backend/)
+// Generate VAPID keys:
+//   node -e "const w=require('web-push');const k=w.generateVAPIDKeys();console.log(JSON.stringify(k))"
+// Add VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY to backend/.env
+// ─────────────────────────────────────────────
+let webPush = null;
+try {
+  webPush = require('web-push');
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webPush.setVapidDetails(
+      `mailto:${process.env.GMAIL_USER || 'admin@driptrack.com'}`,
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+    console.log('✅ Web Push configured');
+  } else {
+    console.log('⚠️  Web Push: add VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY to .env');
+    webPush = null;
+  }
+} catch {
+  console.log('⚠️  Web Push disabled — run: cd backend && npm install web-push');
+}
+
+const pushSubSchema = new mongoose.Schema({
+  userId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+  endpoint: { type: String, required: true, unique: true },
+  keys:     { p256dh: String, auth: String },
+  createdAt:{ type: Date, default: Date.now },
+});
+const PushSubscription = mongoose.model('PushSubscription', pushSubSchema);
+
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ key: process.env.VAPID_PUBLIC_KEY || null });
+});
+
+app.post('/api/push/subscribe', authMiddleware, async (req, res) => {
+  const { subscription } = req.body;
+  if (!subscription?.endpoint) return res.status(400).json({ message: 'Invalid subscription' });
+  try {
+    await PushSubscription.findOneAndUpdate(
+      { endpoint: subscription.endpoint },
+      { userId: req.user.userId, endpoint: subscription.endpoint, keys: subscription.keys },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true });
+  } catch { res.status(500).json({ message: 'Server error' }); }
+});
+
+app.delete('/api/push/unsubscribe', authMiddleware, async (req, res) => {
+  const { endpoint } = req.body;
+  if (endpoint) await PushSubscription.deleteOne({ endpoint }).catch(() => {});
+  res.json({ success: true });
+});
+
+async function sendPushToUser(userId, payload) {
+  if (!webPush || mongoose.connection.readyState !== 1) return;
+  try {
+    const subs = await PushSubscription.find({ userId });
+    for (const sub of subs) {
+      try {
+        await webPush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload));
+      } catch (err) {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          await PushSubscription.deleteOne({ _id: sub._id });
+        }
+      }
+    }
+  } catch {}
+}
+
+// ─────────────────────────────────────────────
+// BIGGEST MOVERS ENDPOINT
+// Returns products with largest price swings in last 48h
+// ─────────────────────────────────────────────
+app.get('/api/movers', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) return res.json({ gainers: [], losers: [] });
+  try {
+    const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const products = await PriceHistory.aggregate([
+      { $match: { timestamp: { $gte: since } } },
+      { $sort: { timestamp: 1 } },
+      { $group: { _id: '$productId', first: { $first: '$price' }, last: { $last: '$price' }, count: { $sum: 1 } } },
+      { $match: { count: { $gte: 2 } } },
+    ]);
+    const all = products.map(p => ({
+      name: p._id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      productId: p._id,
+      firstPrice: parseFloat(p.first.toFixed(2)),
+      currentPrice: parseFloat(p.last.toFixed(2)),
+      changePct: parseFloat(((p.last - p.first) / p.first * 100).toFixed(1)),
+    })).filter(m => Math.abs(m.changePct) >= 0.3);
+    all.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
+    res.json({ gainers: all.filter(m => m.changePct > 0).slice(0, 6), losers: all.filter(m => m.changePct < 0).slice(0, 6) });
+  } catch { res.json({ gainers: [], losers: [] }); }
+});
+
+// ─────────────────────────────────────────────
+// SEARCH AUTOCOMPLETE SUGGESTIONS
+// ─────────────────────────────────────────────
+const SUGGESTION_LIST = [
+  // Nike
+  'Nike Air Jordan 1 Retro High OG','Nike Air Jordan 1 Low','Nike Air Jordan 4 Retro',
+  'Nike Air Jordan 4 Military Black','Nike Air Jordan 11 Retro','Nike Air Jordan 3 Retro',
+  'Nike Air Jordan 6 Retro','Nike Dunk Low Panda','Nike Dunk High','Nike Dunk Low Retro',
+  'Nike Air Max 90','Nike Air Max 97 Silver Bullet','Nike Air Max 95',
+  'Nike Air Force 1 Low','Nike Air Force 1 High','Nike Air Max 270',
+  'Nike Blazer Mid 77','Nike React Element 55','Nike Pegasus 40',
+  'Nike x Off-White Air Force 1','Nike x Sacai Vaporwaffle',
+  // Adidas
+  'Adidas Yeezy Boost 350 V2 Zebra','Adidas Yeezy Boost 350 V2 Beluga',
+  'Adidas Yeezy Slide','Adidas Yeezy 700 V3','Adidas Yeezy Foam Runner',
+  'Adidas Stan Smith','Adidas Samba OG','Adidas Gazelle Indoor',
+  'Adidas Campus 00s','Adidas Forum Low','Adidas Ultraboost 22',
+  // New Balance
+  'New Balance 550 White Green','New Balance 574 Legacy','New Balance 990v5',
+  'New Balance 993 Made in USA','New Balance 2002R Protection Pack',
+  'New Balance 1906R','New Balance 327','New Balance 9060',
+  // Other Sneakers
+  'Asics Gel-Kayano 14','Asics Gel-Lyte III','Asics Gel-1090',
+  'Converse Chuck Taylor All Star 70','Converse Run Star Hike',
+  'Vans Old Skool Black White','Vans Sk8-Hi','Vans Authentic',
+  'Reebok Classic Leather','Reebok Club C 85',
+  'Salomon XT-6','On Running Cloudmonster',
+  'Balenciaga Triple S','Balenciaga Track','Dior B23 Sneaker',
+  'Jordan 4 Military Black','Jordan 1 Chicago','Jordan 3 White Cement',
+  // Watches
+  'Rolex Submariner Date','Rolex Daytona 116500LN','Rolex GMT Master II Pepsi',
+  'Rolex Datejust 41','Rolex Day-Date 40','AP Royal Oak 15500ST',
+  'AP Royal Oak Offshore','Patek Philippe Nautilus 5711','Patek Philippe Aquanaut',
+  'Omega Speedmaster Professional','Omega Seamaster 300M','Omega Constellation',
+  'Casio G-Shock GW-M5610','Casio G-Shock GA-2100','Seiko Prospex Turtle',
+  'Tag Heuer Carrera','IWC Pilot Mark XVIII','Cartier Santos Medium',
+  'Breitling Navitimer','Longines Hydroconquest',
+  // Bags
+  'Louis Vuitton Neverfull MM','Louis Vuitton Speedy 30','Louis Vuitton OnTheGo',
+  'Louis Vuitton Pochette Accessoires','Louis Vuitton Keepall 45',
+  'Gucci GG Marmont Matelasse','Gucci Dionysus Bag','Gucci Horsebit 1955',
+  'Hermès Birkin 30','Hermès Kelly 25','Hermès Picotin',
+  'Chanel Classic Flap Medium','Chanel Boy Bag','Chanel 19 Bag',
+  'Prada Re-Nylon Backpack','Prada Cleo Bag','Coach Tabby Shoulder Bag',
+  'Bottega Veneta Jodie','Celine Box Bag','Dior Lady Dior',
+  // Streetwear
+  'Supreme Box Logo Hoodie','Supreme Box Logo Tee','Supreme Crewneck',
+  'Off-White Industrial Belt','Off-White Arrows Hoodie','Palace Tri-Ferg Hoodie',
+  'Stussy 8 Ball Fleece','Essentials Fear of God Hoodie','Kith Box Logo Tee',
+  'Ami Paris Ami De Coeur Hoodie','Stone Island Shadow Project',
+  'Carhartt WIP Active Jacket',
+  // Sunglasses
+  'Ray-Ban Aviator Classic','Ray-Ban Wayfarer Original','Ray-Ban Clubmaster',
+  'Oakley Frogskins Prizm','Oakley Radar EV Path','Oakley Holbrook',
+  'Gentle Monster Sunglasses','Celine Sunglasses',
+  // Accessories
+  'Chrome Hearts Ring','Chrome Hearts Belt','Cartier Love Bracelet',
+  'Van Cleef Alhambra Necklace','Tiffany T Wire Bracelet',
+];
+
+app.get('/api/suggestions', (req, res) => {
+  const { q } = req.query;
+  if (!q || q.length < 2) return res.json({ suggestions: [] });
+  const ql = q.toLowerCase();
+  const matches = SUGGESTION_LIST.filter(s => s.toLowerCase().includes(ql)).slice(0, 7);
+  res.json({ suggestions: matches });
+});
+
+// ─────────────────────────────────────────────
+// PRICE HISTORY CRON JOB
+// Fetches popular products every hour to build real price history
+// ─────────────────────────────────────────────
+const TRACKED_PRODUCTS = [
+  // Sneakers
+  'Nike Air Jordan 1 Chicago','Nike Air Jordan 4 Military Black','Nike Dunk Low Panda',
+  'Nike Air Force 1 Low','Nike Air Max 90','Nike Blazer Mid 77',
+  'Adidas Yeezy Boost 350 V2 Zebra','Adidas Yeezy Slide','Adidas Samba OG',
+  'Adidas Stan Smith','New Balance 550 White Green','New Balance 2002R',
+  'Asics Gel-Kayano 14','Converse Chuck Taylor 70','Vans Old Skool',
+  'Jordan 4 Military Black','Jordan 1 Retro High OG',
+  // Watches
+  'Rolex Submariner Date','Rolex Daytona 116500LN','AP Royal Oak 15500ST',
+  'Omega Speedmaster Professional','Casio G-Shock GW-M5610',
+  // Bags
+  'Louis Vuitton Neverfull MM','Gucci GG Marmont','Hermès Birkin 30',
+  'Chanel Classic Flap','Prada Re-Nylon Backpack',
+  // Streetwear
+  'Supreme Box Logo Hoodie','Off-White Industrial Belt','Essentials Fear of God Hoodie',
+  // Sunglasses
+  'Ray-Ban Aviator Classic','Oakley Frogskins',
+];
+
+async function runPriceHistoryCron() {
+  if (mongoose.connection.readyState !== 1) return;
+  console.log('\n⏰ Hourly price history cron running...');
+  for (const product of TRACKED_PRODUCTS) {
+    try {
+      const [amazon, ebay] = await Promise.all([getAmazonPrice(product), getEbayPrice(product)]);
+      const best = [amazon, ebay].filter(Boolean).sort((a, b) => (a.price || 1e9) - (b.price || 1e9))[0];
+      if (best?.price) {
+        const key = product.toLowerCase().replace(/\s+/g, '-');
+        await savePriceHistory(key, best.price, best.source);
+        console.log(`  ✓ ${product}: $${best.price} (${best.source})`);
+      }
+      await new Promise(r => setTimeout(r, 2500)); // avoid rate limits
+    } catch {}
+  }
+  console.log('✅ Cron complete');
+}
+// First run after 60s (server is fully up), then every hour
+setTimeout(runPriceHistoryCron, 60000);
+setInterval(runPriceHistoryCron, 60 * 60 * 1000);
+
 // ── UPDATE PROFILE
 app.post('/auth/update-profile', authMiddleware, async (req, res) => {
   const { firstName, lastName } = req.body;
@@ -729,9 +1147,22 @@ app.post('/auth/change-password', authMiddleware, async (req, res) => {
   } catch { res.status(500).json({ message: 'Server error' }); }
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 DRIPTRACK running at http://localhost:${PORT}`);
-  console.log(`📡 Open: http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  // Get local network IP so you can open on phone
+  const { networkInterfaces } = require('os');
+  const nets = networkInterfaces();
+  let localIP = 'YOUR_IP';
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        localIP = net.address;
+        break;
+      }
+    }
+  }
+  console.log(`\n🚀 DRIPTRACK running`);
+  console.log(`💻 Laptop:  http://localhost:${PORT}`);
+  console.log(`📱 Phone:   http://${localIP}:${PORT}  ← open this on your phone`);
   console.log(`👤 Register: http://localhost:${PORT}/register.html`);
-  console.log(`🔑 Login: http://localhost:${PORT}/login.html\n`);
+  console.log(`🔑 Login:    http://localhost:${PORT}/login.html\n`);
 });
