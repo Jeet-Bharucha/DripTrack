@@ -652,23 +652,13 @@ const revealObs=new IntersectionObserver(entries=>{
 },{threshold:0.1,rootMargin:'0px 0px -40px 0px'});
 document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
 
-// ── AUTH STATE — swap CTA if already logged in
+// ── AUTH STATE — if already logged in, go straight to the app
 (function(){
   const token=localStorage.getItem('driptrack_token');
   const userStr=localStorage.getItem('driptrack_user');
   if(token&&userStr){
-    try{
-      const u=JSON.parse(userStr);
-      // Replace "Get Started Free" with "Go to App"
-      document.querySelectorAll('a[href="/register.html"]').forEach(a=>{
-        a.href='/app';
-        a.querySelector('span') ? a.querySelector('span').textContent=`Welcome back, ${u.firstName} →` : a.textContent=`Welcome back, ${u.firstName} →`;
-      });
-      // Replace sign in with account
-      document.querySelectorAll('a[href="/login.html"]').forEach(a=>{
-        if(a.textContent.trim().toLowerCase().includes('sign')){a.href='/account.html';a.textContent='My Account';}
-      });
-    }catch(e){}
+    // Already authenticated → skip landing page, open the app immediately
+    window.location.replace('/app');
   }
 })();
 </script>

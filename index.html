@@ -1190,6 +1190,15 @@ footer{padding:60px 48px;border-top:1px solid var(--grey-700);display:flex;justi
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:699;"></div>
 
 <script>
+// ── AUTH GUARD — redirect to landing page if not logged in
+(function(){
+  const token = localStorage.getItem('driptrack_token');
+  if (!token) {
+    // Not logged in — send to landing page
+    window.location.replace('/');
+  }
+})();
+
 // Force-hide native cursor (belt-and-suspenders for Edge/Chromium)
 (function(){var s=document.createElement('style');s.textContent='html,body,*,*::before,*::after{cursor:none!important}';document.documentElement.appendChild(s);})();
 
