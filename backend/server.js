@@ -694,7 +694,10 @@ async function getAmazonPrice(searchTerm) {
     if (!item) return null;
     const url = item.asin ? `https://www.amazon.com/dp/${item.asin}` : `https://www.amazon.com/s?k=${encodeURIComponent(searchTerm)}`;
     return { source:'Amazon', price:item.price?.value||null, currency:'USD', url, title:item.title, image:item.image, verified:true };
-  } catch (err) { console.error('Amazon error:',err.message); return null; }
+  } catch (err) {
+    console.error('  ❌ Amazon/Rainforest error:', err.response?.status, err.response?.data?.message || err.message);
+    return null;
+  }
 }
 
 // EBAY
@@ -746,7 +749,10 @@ async function getEbayPrice(searchTerm) {
         verified: (i.seller?.feedbackScore||0) > 100,
       })),
     };
-  } catch (err) { console.error('eBay error:',err.message); return null; }
+  } catch (err) {
+    console.error('  ❌ eBay error:', err.response?.status, err.response?.data?.errors?.[0]?.message || err.message);
+    return null;
+  }
 }
 
 // SERPAPI
@@ -754,19 +760,30 @@ async function getGoogleShoppingPrices(searchTerm) {
   if (!process.env.SERPAPI_KEY) return [];
   try {
     const res = await axios.get('https://serpapi.com/search', {
-      params:{engine:'google_shopping',q:searchTerm,api_key:process.env.SERPAPI_KEY,num:20},
-      timeout:10000,
+      params: { engine:'google_shopping', q:searchTerm, api_key:process.env.SERPAPI_KEY, num:20 },
+      timeout: 10000,
     });
-    const results = res.data.shopping_results||[];
-    const trusted = results.filter(r=>isTrustedRetailer(r.source));
-    const clean = (trusted.length?trusted:results).filter(r=>isValidListing({price:r.extracted_price,title:r.title},searchTerm));
-    clean.sort((a,b)=>(a.extracted_price||0)-(b.extracted_price||0));
-    return clean.slice(0,8).map(r=>({
-      source:r.source||'Unknown', price:r.extracted_price||null, currency:'USD',
-      url:getBestUrl(r.link,r.source,r.title,searchTerm),
-      title:r.title||'', image:r.thumbnail||null, verified:isTrustedRetailer(r.source),
-    })).filter(r=>r.price);
-  } catch (err) { console.error('SerpAPI error:',err.message); return []; }
+    const raw     = res.data.shopping_results || [];
+    const trusted = raw.filter(r => isTrustedRetailer(r.source));
+    // Use trusted sources first; fall back to all results if no trusted found
+    const pool = trusted.length ? trusted : raw;
+    const clean = pool.filter(r => isValidListing({ price:r.extracted_price, title:r.title }, searchTerm));
+    clean.sort((a, b) => (a.extracted_price||0) - (b.extracted_price||0));
+    const mapped = clean.slice(0, 8).map(r => ({
+      source:   r.source || 'Unknown',
+      price:    r.extracted_price || null,
+      currency: 'USD',
+      url:      getBestUrl(r.link, r.source, r.title, searchTerm),
+      title:    r.title || '',
+      image:    r.thumbnail || null,
+      verified: isTrustedRetailer(r.source),
+    })).filter(r => r.price);
+    console.log(`  🔍 SerpAPI raw: ${raw.length} total, ${trusted.length} trusted, ${clean.length} after filter → ${mapped.length} returned`);
+    return mapped;
+  } catch (err) {
+    console.error('  ❌ SerpAPI error:', err.response?.status, err.response?.data?.error || err.message);
+    return [];
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -775,8 +792,18 @@ async function getGoogleShoppingPrices(searchTerm) {
 app.get('/api/prices', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: 'Missing ?q=' });
-  console.log(`\n🔍 Searching: ${q}`);
-  const [amazon, ebay, googleResults] = await Promise.all([getAmazonPrice(q), getEbayPrice(q), getGoogleShoppingPrices(q)]);
+  console.log(`\n🔍 Searching: "${q}"`);
+
+  const [amazon, ebay, googleResults] = await Promise.all([
+    getAmazonPrice(q),
+    getEbayPrice(q),
+    getGoogleShoppingPrices(q),
+  ]);
+
+  // Debug — show what each API returned
+  console.log(`  📦 Amazon:  ${amazon ? `$${amazon.price} via ${amazon.source}` : '❌ no result'}`);
+  console.log(`  🛍️  eBay:    ${ebay ? `$${ebay.price} + ${(ebay.extraResults||[]).length} extras` : '❌ no result'}`);
+  console.log(`  🔍 SerpAPI: ${googleResults.length} results — ${googleResults.map(r=>`${r.source}($${r.price})`).join(', ') || 'none'}`);
 
   // Flatten eBay extra results (top-3 eBay listings instead of just best)
   const ebayExtras = ebay?.extraResults || [];
@@ -784,7 +811,7 @@ app.get('/api/prices', async (req, res) => {
 
   const combined = [amazon, ebayMain, ...ebayExtras, ...googleResults].filter(Boolean);
   const deduped  = deduplicateBySource(combined);
-  const checked = authenticityCheck(deduped);
+  const checked  = authenticityCheck(deduped);
 
   // Find best quality image: Amazon > eBay > SerpAPI (in that order)
   const bestImage = amazon?.image || ebay?.image || googleResults.find(r => r?.image)?.image || null;
