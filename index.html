@@ -1699,6 +1699,251 @@ function filterProducts(filter, btn) {
 // Show static products immediately on load; live results replace them when backend responds
 renderStaticProducts('all');
 
+// ─────────────────────────────────────────────────────────────────────
+// LIVE SEARCH — calls backend /api/prices and renders results
+// ─────────────────────────────────────────────────────────────────────
+const _API_BASE = `http://${location.hostname}:3000/api`;
+
+async function searchLivePrices(query) {
+  if (!query || !query.trim()) return;
+  query = query.trim();
+
+  const btn     = document.getElementById('search-btn');
+  const clearBtn = document.getElementById('search-clear-btn');
+  const grid    = document.getElementById('product-grid');
+  const countEl = document.getElementById('result-count');
+
+  // Loading state
+  if (btn)  { btn.textContent = 'Searching...'; btn.disabled = true; }
+  grid.innerHTML = `
+    <div style="grid-column:1/-1;padding:80px 20px;text-align:center;
+                font-family:'Space Mono',monospace;font-size:11px;
+                letter-spacing:2px;color:var(--grey-400)">
+      <div style="font-size:28px;margin-bottom:16px;animation:spin 1s linear infinite;display:inline-block">⟳</div><br>
+      FETCHING LIVE PRICES...
+    </div>`;
+
+  try {
+    const res  = await fetch(`${_API_BASE}/prices?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    const results = (data.results || []).filter(r => r && r.price);
+
+    window._lastResults  = results;
+    window._lastFetchTime = Date.now();
+    window._lastQuery    = query;
+
+    renderLiveResults(results);
+    if (clearBtn) clearBtn.style.display = 'block';
+    if (countEl)  countEl.textContent = results.length ? `${results.length} source${results.length > 1 ? 's' : ''} found` : '';
+    if (typeof _updateTimestampBar === 'function') _updateTimestampBar();
+    if (typeof showSavingsBanner   === 'function') showSavingsBanner(results);
+
+    // Push to browser history so back button works
+    const url = `/app?q=${encodeURIComponent(query)}`;
+    if (window.history?.replaceState) window.history.replaceState({}, '', url);
+
+  } catch (err) {
+    grid.innerHTML = `
+      <div style="grid-column:1/-1;padding:80px 20px;text-align:center;
+                  font-family:'Space Mono',monospace;font-size:11px;
+                  letter-spacing:2px;color:var(--accent2)">
+        ⚠️ COULD NOT CONNECT — MAKE SURE BACKEND IS RUNNING<br>
+        <span style="color:var(--grey-400);margin-top:8px;display:block">cd backend && node server.js</span>
+      </div>`;
+  } finally {
+    if (btn) { btn.textContent = 'Search'; btn.disabled = false; }
+  }
+}
+
+function renderLiveResults(results) {
+  const grid = document.getElementById('product-grid');
+  if (!results || !results.length) {
+    grid.innerHTML = `
+      <div style="grid-column:1/-1;padding:80px 20px;text-align:center;
+                  font-family:'Space Mono',monospace;font-size:11px;
+                  letter-spacing:2px;color:var(--grey-400)">
+        NO RESULTS FOUND — TRY A DIFFERENT SEARCH
+      </div>`;
+    return;
+  }
+
+  const query = window._lastQuery || '';
+
+  grid.innerHTML = results.map((r, i) => {
+    const price       = typeof formatPrice === 'function' ? formatPrice(r.price) : ('$' + r.price);
+    const isVerified  = r.verified !== false;
+    const isSuspicious = r.suspicious;
+    const titleText   = (r.title || query).slice(0, 44) + ((r.title || query).length > 44 ? '...' : '');
+    const imgHtml     = r.image
+      ? `<img src="${r.image}" alt="${r.source}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`
+      : `<div style="font-size:80px;width:100%;height:100%;display:flex;align-items:center;justify-content:center;filter:grayscale(1)">👟</div>`;
+    const shopBtn = r.url
+      ? `<a href="${r.url}" target="_blank" rel="noopener noreferrer"
+             onclick="event.stopPropagation()"
+             style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;
+                    text-transform:uppercase;padding:6px 14px;background:var(--grey-700);
+                    border:1px solid var(--grey-600);color:var(--accent);text-decoration:none;display:inline-block"
+             onmouseover="this.style.background='var(--accent)';this.style.color='var(--black)'"
+             onmouseout="this.style.background='var(--grey-700)';this.style.color='var(--accent)'">Shop →</a>`
+      : '';
+    // Safely escape for inline JS
+    const safeTitle  = titleText.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const safeSource = (r.source||'').replace(/'/g,"\\'");
+    const safeUrl    = (r.url||'').replace(/'/g,"\\'");
+    const safeImg    = (r.image||'').replace(/'/g,"\\'");
+    return `
+      <div class="product-card" style="animation-delay:${i*0.07}s" onclick="openLivePanel(${i})">
+        <div class="card-img-wrap">
+          ${imgHtml}
+          ${isSuspicious ? '<span class="card-badge" style="left:auto;right:12px;background:#ff3c3c;color:#fff;font-size:8px">⚠️ Suspicious</span>' : ''}
+          ${i===0 ? '<span class="card-badge badge-hot" style="left:auto;right:12px">⭐ BEST</span>' : ''}
+          ${isVerified && !isSuspicious ? '<span class="card-badge badge-auth">✓ Verified</span>' : ''}
+        </div>
+        <div class="card-body">
+          <div class="card-category">${r.source}</div>
+          <div class="card-name" style="font-size:17px;line-height:1.15">${titleText}</div>
+          <div class="card-colorway">via ${r.source}</div>
+          <div class="price-row">
+            <div class="price-main">${price}</div>
+            ${isSuspicious ? '<div class="price-change down">⚠️ LOW</div>' : ''}
+          </div>
+          <div class="sources-row" style="margin-top:10px;gap:8px;display:flex;align-items:center;flex-wrap:wrap">
+            ${shopBtn}
+            <button onclick="event.stopPropagation();addToWatchlist({title:'${safeTitle}',source:'${safeSource}',price:${r.price},url:'${safeUrl}',image:'${safeImg}'})"
+                    style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;
+                           text-transform:uppercase;padding:6px 12px;background:transparent;
+                           border:1px solid var(--grey-600);color:var(--grey-400);cursor:pointer;transition:all 0.2s"
+                    onmouseover="this.style.borderColor='#ff6b6b';this.style.color='#ff6b6b'"
+                    onmouseout="this.style.borderColor='var(--grey-600)';this.style.color='var(--grey-400)'">❤️</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  refreshCursor();
+}
+
+function _clearSearch() {
+  const inp      = document.getElementById('search-input');
+  const clearBtn = document.getElementById('search-clear-btn');
+  const countEl  = document.getElementById('result-count');
+  if (inp)      inp.value = '';
+  if (clearBtn) clearBtn.style.display = 'none';
+  if (countEl)  countEl.textContent = '';
+  window._lastResults  = null;
+  window._lastFetchTime = null;
+  window._lastQuery    = null;
+  const banner = document.getElementById('savings-banner');
+  if (banner) banner.remove();
+  if (window.history?.replaceState) window.history.replaceState({}, '', '/app');
+  // Reset filter pills to "All"
+  document.querySelectorAll('.pill').forEach((p, i) => p.classList.toggle('active', i === 0));
+  renderStaticProducts('all');
+}
+
+function sortProducts(type, btn) {
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  if (window._lastResults && window._lastResults.length) {
+    // Sort live results
+    const sorted = [...window._lastResults].filter(r => r && r.price);
+    if (type === 'price-asc')  sorted.sort((a, b) => a.price - b.price);
+    if (type === 'price-desc') sorted.sort((a, b) => b.price - a.price);
+    if (type === 'hot')        sorted.sort((a, b) => (b.verified ? 1 : 0) - (a.verified ? 1 : 0));
+    if (type === 'drop')       sorted.sort((a, b) => a.price - b.price); // cheapest first for live
+    window._lastResults = sorted;
+    renderLiveResults(sorted);
+  } else {
+    // Sort static products
+    let items = [...staticProducts];
+    if (type === 'price-asc')  items.sort((a, b) => a.price - b.price);
+    if (type === 'price-desc') items.sort((a, b) => b.price - a.price);
+    if (type === 'drop')       items = items.filter(p => p.change < 0).sort((a, b) => a.change - b.change);
+    if (type === 'hot')        items = items.filter(p => p.hot);
+    // Re-render subset using existing renderStaticProducts logic
+    const grid = document.getElementById('product-grid');
+    grid.innerHTML = items.map((p, i) => {
+      const pts=p.history, min=Math.min(...pts), max=Math.max(...pts);
+      const w=280,h=40,pad=4;
+      const coords=pts.map((v,j)=>{
+        const x=(j/(pts.length-1))*w;
+        const y=h-pad-((v-min)/(max-min||1))*(h-pad*2);
+        return `${x},${y}`;
+      });
+      const pathD='M '+coords.join(' L ');
+      const areaD='M 0,'+h+' L '+coords.join(' L ')+` L ${w},${h} Z`;
+      const isUp=p.change>=0, color=isUp?'var(--up)':'var(--down)';
+      const fmtPrice=typeof formatPrice==='function'?formatPrice(p.price):('$'+p.price);
+      return `
+        <div class="product-card" style="animation-delay:${i*0.07}s" onclick="openStaticPanel(${p.id})">
+          <div class="card-img-wrap view-360-wrap">
+            <div class="card-img-placeholder" style="font-size:72px">${p.emoji}</div>
+            ${p.hot?'<span class="card-badge badge-hot" style="left:auto;right:12px">🔥 HOT</span>':''}
+            <span class="card-badge badge-auth">✓ Verified</span>
+          </div>
+          <div class="card-body">
+            <div class="card-category">${p.category}</div>
+            <div class="card-name">${p.name}</div>
+            <div class="card-colorway">${p.brand} · ${p.color}</div>
+            <div class="price-row">
+              <div class="price-main">${fmtPrice}</div>
+              <div class="price-change ${isUp?'up':'down'}">${isUp?'▲':'▼'}${Math.abs(p.change)}%</div>
+            </div>
+            <div class="mini-chart">
+              <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+                <defs><linearGradient id="mgs${p.id}" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+                </linearGradient></defs>
+                <path d="${areaD}" fill="url(#mgs${p.id})"/>
+                <path d="${pathD}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="sources-row" style="margin-top:10px;gap:8px;display:flex;align-items:center;flex-wrap:wrap">
+              <a href="${p.sources[0].url}" target="_blank" rel="noopener noreferrer"
+                 onclick="event.stopPropagation()"
+                 style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;
+                        text-transform:uppercase;padding:6px 14px;background:var(--grey-700);
+                        border:1px solid var(--grey-600);color:var(--accent);text-decoration:none;display:inline-block"
+                 onmouseover="this.style.background='var(--accent)';this.style.color='var(--black)'"
+                 onmouseout="this.style.background='var(--grey-700)';this.style.color='var(--accent)'">Shop →</a>
+              <button onclick="event.stopPropagation();addStaticToWatchlist(${p.id})"
+                      id="swl-btn-${p.id}"
+                      style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;
+                             text-transform:uppercase;padding:6px 12px;background:transparent;
+                             border:1px solid var(--grey-600);color:var(--grey-400);cursor:pointer;transition:all 0.2s"
+                      onmouseover="this.style.borderColor='#ff6b6b';this.style.color='#ff6b6b'"
+                      onmouseout="if(!this.disabled){this.style.borderColor='var(--grey-600)';this.style.color='var(--grey-400)'}">❤️</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+    markStaticWatchlistedCards();
+    refreshCursor();
+  }
+}
+
+// ─── WIRE UP SEARCH BUTTON + ENTER KEY ───────────────────────────────────────
+(function wireSearch() {
+  const searchBtn = document.getElementById('search-btn');
+  const searchInp = document.getElementById('search-input');
+  if (searchBtn) {
+    searchBtn.addEventListener('click', () => {
+      const q = searchInp ? searchInp.value.trim() : '';
+      if (q) searchLivePrices(q);
+    });
+  }
+  if (searchInp) {
+    searchInp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const q = e.target.value.trim();
+        if (q) searchLivePrices(q);
+      }
+    });
+  }
+})();
+
 // ─── SEARCH BAR INPUT WATCHER — hide clear button when input is empty ────
 (function() {
   const inp = document.getElementById('search-input');
