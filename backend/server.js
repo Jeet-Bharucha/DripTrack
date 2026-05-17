@@ -557,11 +557,24 @@ function isTrustedRetailer(source) {
 }
 
 const JUNK_KEYWORDS = [
-  'wire','cable','battery','charger','extension','sticker','decal','patch',
-  'pin','badge','keychain','charm','party favor','cake topper','box only',
-  'empty box','dust bag only','case only','lot of','pack of','set of',
-  '6 pc','8 pc','10 pc','replica','inspired by','lego','toy','poster',
-  'photo','print','pawn',
+  // Hardware / parts / repairs
+  'wire','cable','battery','charger','extension','spring','clasp','buckle',
+  'strap','band','lace','laces','insole','sole','repair','replacement part',
+  'spare part','service kit','tool','hinge','screw','link','bracelet link',
+  'crystal','bezel insert','crown','stem','pushers','gasket','seal',
+  // Accessories / small items
+  'sticker','decal','patch','pin','badge','keychain','charm','lanyard',
+  'dust bag only','case only','box only','empty box','authentication card only',
+  'tag only','hang tag',
+  // Bulk / lot / novelty
+  'party favor','cake topper','lot of','pack of','set of',
+  '6 pc','8 pc','10 pc','12 pc','24 pc',
+  // Fakes / non-product
+  'replica','inspired by','lego','toy','poster','photo','print','pawn',
+  'for older model','for models','clasp repair','push button','end link',
+  'rubber strap','leather strap','nylon strap','nato strap',
+  // Clothing parts / non-product
+  'iron on','heat transfer','embroidery','sewing','fabric',
 ];
 function isJunkListing(title) {
   if (!title) return false;
@@ -575,6 +588,21 @@ function isKidsProduct(title) {
     t.includes('preschool')||t.includes('toddler')||t.includes('infant')||
     t.includes('big kids')||t.includes('little kids')||t.includes('youth');
 }
+
+// Check that the listing title is actually relevant to the search term
+// At least 1 significant word from the search must appear in the title
+function isRelevantListing(title, searchTerm) {
+  if (!title || !searchTerm) return true; // give benefit of doubt if no info
+  const titleL = title.toLowerCase();
+  const searchL = searchTerm.toLowerCase();
+  // Split search into meaningful words (3+ chars, skip common words)
+  const stopWords = new Set(['the','and','for','with','from','this','that','are','was','its','has','not','but','can','all','any','new']);
+  const searchWords = searchL.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+  if (!searchWords.length) return true;
+  // At least 1 search word must appear in the title
+  return searchWords.some(w => titleL.includes(w));
+}
+
 function getMinPrice(s) {
   s = (s||'').toLowerCase();
   if (s.includes('rolex')||s.includes('audemars')||s.includes('patek')) return 1000;
@@ -591,15 +619,23 @@ function isValidListing(result, searchTerm) {
   if (result.price < getMinPrice(searchTerm)) return false;
   if (isJunkListing(result.title)) return false;
   if (isKidsProduct(result.title)) return false;
+  if (!isRelevantListing(result.title, searchTerm)) return false;
   return true;
 }
 function deduplicateBySource(results) {
   const seen = {};
+  const out  = [];
+  let ebayCount = 0;
   for (const r of results) {
     const key = (r.source||'unknown').toLowerCase();
-    if (!seen[key]||r.price < seen[key].price) seen[key] = r;
+    // Allow up to 3 eBay results (different products/sellers), 1 per every other source
+    if (key === 'ebay') {
+      if (ebayCount < 3) { out.push(r); ebayCount++; }
+    } else {
+      if (!seen[key] || r.price < seen[key].price) { seen[key] = r; }
+    }
   }
-  return Object.values(seen);
+  return [...Object.values(seen), ...out];
 }
 function authenticityCheck(prices) {
   const validPrices = prices.filter(p=>p&&p.price>0).map(p=>p.price);
@@ -669,17 +705,47 @@ async function getEbayPrice(searchTerm) {
       'grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope',
       { headers:{'Content-Type':'application/x-www-form-urlencoded'}, auth:{username:process.env.EBAY_CLIENT_ID,password:process.env.EBAY_CLIENT_SECRET} }
     );
+    // Fetch more results so filtering has enough to work with
     const res = await axios.get('https://api.ebay.com/buy/browse/v1/item_summary/search', {
       headers:{Authorization:`Bearer ${tokenRes.data.access_token}`},
-      params:{q:searchTerm,filter:'conditionIds:{1000}',sort:'price',limit:10},
+      params:{
+        q: searchTerm,
+        filter: 'conditionIds:{1000|1500|2000|2500}', // new, like new, very good, good
+        sort: 'price',
+        limit: 20,
+      },
       timeout:8000,
     });
     const items = (res.data.itemSummaries||[])
-      .filter(i=>isValidListing({price:parseFloat(i.price?.value),title:i.title},searchTerm))
-      .filter(i=>(i.seller?.feedbackScore||0)>50);
+      .filter(i => isValidListing({ price: parseFloat(i.price?.value), title: i.title }, searchTerm))
+      .filter(i => (i.seller?.feedbackScore||0) > 50)
+      // Extra: title must contain at least one word from searchTerm (already in isValidListing, belt+suspenders)
+      .filter(i => isRelevantListing(i.title, searchTerm));
+
     if (!items[0]) return null;
-    const item = items[0];
-    return { source:'eBay', price:parseFloat(item.price?.value)||null, currency:'USD', url:item.itemWebUrl||`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(searchTerm)}`, title:item.title, image:item.image?.imageUrl, verified:(item.seller?.feedbackScore||0)>100 };
+
+    // Return top 3 relevant eBay results instead of just 1
+    const topItems = items.slice(0, 3);
+    const best = topItems[0];
+    return {
+      source: 'eBay',
+      price: parseFloat(best.price?.value)||null,
+      currency: 'USD',
+      url: best.itemWebUrl || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(searchTerm)}`,
+      title: best.title,
+      image: best.image?.imageUrl,
+      verified: (best.seller?.feedbackScore||0) > 100,
+      // Extra results for display
+      extraResults: topItems.slice(1).map(i => ({
+        source: 'eBay',
+        price: parseFloat(i.price?.value)||null,
+        currency: 'USD',
+        url: i.itemWebUrl,
+        title: i.title,
+        image: i.image?.imageUrl,
+        verified: (i.seller?.feedbackScore||0) > 100,
+      })),
+    };
   } catch (err) { console.error('eBay error:',err.message); return null; }
 }
 
@@ -711,8 +777,13 @@ app.get('/api/prices', async (req, res) => {
   if (!q) return res.status(400).json({ error: 'Missing ?q=' });
   console.log(`\n🔍 Searching: ${q}`);
   const [amazon, ebay, googleResults] = await Promise.all([getAmazonPrice(q), getEbayPrice(q), getGoogleShoppingPrices(q)]);
-  const combined = [amazon, ebay, ...googleResults].filter(Boolean);
-  const deduped = deduplicateBySource(combined);
+
+  // Flatten eBay extra results (top-3 eBay listings instead of just best)
+  const ebayExtras = ebay?.extraResults || [];
+  const ebayMain   = ebay ? { ...ebay, extraResults: undefined } : null;
+
+  const combined = [amazon, ebayMain, ...ebayExtras, ...googleResults].filter(Boolean);
+  const deduped  = deduplicateBySource(combined);
   const checked = authenticityCheck(deduped);
 
   // Find best quality image: Amazon > eBay > SerpAPI (in that order)
