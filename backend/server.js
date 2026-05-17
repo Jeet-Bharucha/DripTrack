@@ -14,16 +14,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'driptrack_secret_key_change_in_pro
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..')));
 
-// ── LANDING PAGE as root
+// ── ROUTES must come BEFORE express.static so they aren't overridden
+// Landing page at root
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'landing.html'));
 });
-// ── APP lives at /app
+// Main app at /app
 app.get('/app', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
+
+// Static files (index: false prevents express from auto-serving index.html for /)
+app.use(express.static(path.join(__dirname, '..'), { index: false }));
 
 // ─────────────────────────────────────────────
 // MONGODB CONNECTION

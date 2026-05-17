@@ -170,7 +170,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <!-- LEFT PANEL -->
 <div class="left-panel">
   <div class="brand">
-    <a href="index.html" class="brand-logo">DRIP<span>TRACK</span></a>
+    <a href="/" class="brand-logo">DRIP<span>TRACK</span></a>
     <div class="brand-tag">Real Prices. Real Products. Real Time.</div>
   </div>
 
@@ -254,7 +254,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     </div>
 
     <div class="form-footer">
-      <a href="index.html">← Back to DRIPTRACK</a>
+      <a href="/">← Back to DRIPTRACK</a>
       &nbsp;·&nbsp;
       <a href="#">Privacy Policy</a>
       &nbsp;·&nbsp;
@@ -358,11 +358,13 @@ async function handleLogin() {
       // Save token
       localStorage.setItem('driptrack_token', data.token);
       localStorage.setItem('driptrack_user', JSON.stringify(data.user));
+      // Flag so /app knows user JUST logged in → show "Welcome back" toast
+      sessionStorage.setItem('driptrack_just_logged_in', '1');
       // Show success
       document.getElementById('loginForm').style.display = 'none';
       document.getElementById('successMsg').classList.add('show');
       // Redirect after 1.5s
-      setTimeout(() => window.location.href = 'index.html', 1500);
+      setTimeout(() => { window.location.href = '/app'; }, 1500);
     } else {
       loginError.textContent = data.message || 'Invalid email or password';
       loginError.classList.add('show');
@@ -460,15 +462,35 @@ function socialLogin(provider) {
   const params = new URLSearchParams(window.location.search);
   const token = params.get('token');
   const userParam = params.get('user');
+  const errorParam = params.get('error');
+
+  // Show error if Google OAuth failed
+  if (errorParam) {
+    const err = document.getElementById('loginError');
+    const msgs = {
+      google_cancelled: 'Google sign-in was cancelled.',
+      google_failed: 'Google sign-in failed — please try again.',
+      google_no_email: 'Could not get email from Google.',
+      google_not_configured: 'Google sign-in is not configured yet.',
+    };
+    err.textContent = '⚠️ ' + (msgs[errorParam] || 'Something went wrong with Google sign-in.');
+    err.classList.add('show');
+  }
+
   if (token && userParam) {
     try {
       const user = JSON.parse(decodeURIComponent(userParam));
       localStorage.setItem('driptrack_token', token);
       localStorage.setItem('driptrack_user', JSON.stringify(user));
+      // Flag so the landing page knows user JUST logged in
+      sessionStorage.setItem('driptrack_just_logged_in', '1');
       document.getElementById('loginForm').style.display = 'none';
       document.getElementById('successMsg').classList.add('show');
-      setTimeout(() => window.location.href = 'index.html', 1500);
-    } catch {}
+      // Redirect to app after brief success flash
+      setTimeout(() => { window.location.href = '/app'; }, 1200);
+    } catch(e) {
+      console.error('Login callback error:', e);
+    }
   }
 })();
 

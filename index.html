@@ -2224,6 +2224,50 @@ function toggleTheme() {
     // Update watchlist count
     const wl = JSON.parse(localStorage.getItem('driptrack_watchlist') || '[]');
     document.getElementById('watchlistCount').textContent = wl.length;
+    // ── WELCOME BACK TOAST (fires once after login/Google OAuth)
+    if (sessionStorage.getItem('driptrack_just_logged_in') === '1') {
+      sessionStorage.removeItem('driptrack_just_logged_in');
+      const firstName = user.firstName || 'back';
+      // Build toast element
+      const wbToast = document.createElement('div');
+      wbToast.id = 'welcomeBackToast';
+      wbToast.style.cssText = [
+        'position:fixed',
+        'top:80px',
+        'left:50%',
+        'transform:translateX(-50%) translateY(-20px)',
+        'background:var(--grey-900)',
+        'border:1px solid var(--accent)',
+        'color:var(--white)',
+        'font-family:"Space Mono",monospace',
+        'font-size:11px',
+        'letter-spacing:2px',
+        'padding:16px 28px',
+        'z-index:9999',
+        'text-transform:uppercase',
+        'white-space:nowrap',
+        'pointer-events:none',
+        'opacity:0',
+        'transition:opacity 0.4s ease, transform 0.4s ease',
+        'box-shadow:0 4px 24px rgba(0,0,0,0.5)',
+      ].join(';');
+      wbToast.innerHTML = `<span style="color:var(--accent)">✓</span> &nbsp;Welcome back, ${firstName}!`;
+      document.body.appendChild(wbToast);
+      // Animate in after a short tick
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          wbToast.style.opacity = '1';
+          wbToast.style.transform = 'translateX(-50%) translateY(0)';
+        });
+      });
+      // Fade out after 3s
+      setTimeout(() => {
+        wbToast.style.opacity = '0';
+        wbToast.style.transform = 'translateX(-50%) translateY(-20px)';
+        setTimeout(() => wbToast.remove(), 500);
+      }, 3000);
+    }
+
     // Record login history
     const history = JSON.parse(localStorage.getItem('driptrack_login_history') || '[]');
     if (!history.length || Date.now() - history[history.length-1].time > 300000) {
