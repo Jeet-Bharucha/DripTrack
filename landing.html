@@ -662,5 +662,346 @@ document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
   }
 })();
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     DRIPTRACK 3D ANIMATION SYSTEM — landing page
+═══════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Scroll progress bar ── */
+#scroll-prog{position:fixed;top:0;left:0;height:2px;width:0%;background:linear-gradient(90deg,#e8ff00,#00f0ff);z-index:9999;transition:width 0.1s linear;pointer-events:none;}
+
+/* ── Card tilt setup ── */
+.feature-card,.float-card,.step-card,.testimonial-card{transform-style:preserve-3d;will-change:transform;}
+.card-shine{position:absolute;inset:0;pointer-events:none;z-index:10;border-radius:inherit;transition:background 0.15s;}
+
+/* ── Holographic shimmer on feature icons ── */
+.feature-icon{
+  display:inline-block;
+  font-size:36px;
+  filter:drop-shadow(0 0 8px rgba(232,255,0,0.5));
+  animation:iconFloat 3s ease-in-out infinite;
+}
+.feature-card:nth-child(2) .feature-icon{animation-delay:0.4s;}
+.feature-card:nth-child(3) .feature-icon{animation-delay:0.8s;}
+.feature-card:nth-child(4) .feature-icon{animation-delay:1.2s;}
+.feature-card:nth-child(5) .feature-icon{animation-delay:1.6s;}
+.feature-card:nth-child(6) .feature-icon{animation-delay:2.0s;}
+@keyframes iconFloat{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-6px) rotate(3deg);}}
+
+/* ── Floating orbs in hero ── */
+.hero-orb{position:absolute;border-radius:50%;pointer-events:none;animation:orbDrift linear infinite;}
+@keyframes orbDrift{0%{transform:translateY(0) translateX(0) scale(1);}25%{transform:translateY(-30px) translateX(20px) scale(1.05);}50%{transform:translateY(-15px) translateX(-10px) scale(0.95);}75%{transform:translateY(-40px) translateX(15px) scale(1.02);}100%{transform:translateY(0) translateX(0) scale(1);}}
+
+/* ── Glitch text ── */
+.glitch{position:relative;}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;inset:0;background:transparent;}
+.glitch::before{color:#e8ff00;animation:glitchA 3s infinite;clip-path:polygon(0 20%,100% 20%,100% 40%,0 40%);}
+.glitch::after{color:#ff3c3c;animation:glitchB 3s infinite;clip-path:polygon(0 60%,100% 60%,100% 80%,0 80%);}
+@keyframes glitchA{0%,90%,100%{transform:translate(0);opacity:0;}91%{transform:translate(-3px,1px);opacity:0.8;}92%{transform:translate(3px,-1px);opacity:0.8;}93%{transform:translate(0);opacity:0;}}
+@keyframes glitchB{0%,88%,100%{transform:translate(0);opacity:0;}89%{transform:translate(3px,2px);opacity:0.6;}90%{transform:translate(-3px,-2px);opacity:0.6;}91%{transform:translate(0);opacity:0;}}
+
+/* ── Magnetic button transition ── */
+.btn-primary,.btn-secondary,.btn-nav-cta{transition:transform 0.4s cubic-bezier(0.23,1,0.32,1),background 0.2s,color 0.2s!important;}
+
+/* ── Particle burst ── */
+.burst-particle{position:fixed;border-radius:50%;pointer-events:none;z-index:9999;}
+
+/* ── Scanline overlay ── */
+.hero::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:2;animation:scanMove 8s linear infinite;}
+@keyframes scanMove{0%{background-position:0 0;}100%{background-position:0 80px;}}
+
+/* ── Number flip ── */
+@keyframes numFlip{0%{transform:translateY(-100%);opacity:0;}60%{transform:translateY(8px);}100%{transform:translateY(0);opacity:1;}}
+.stat-num{display:inline-block;}
+</style>
+
+<div id="scroll-prog"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   1. SCROLL PROGRESS BAR
+══════════════════════════════════════════════════════ */
+(function(){
+  const bar = document.getElementById('scroll-prog');
+  window.addEventListener('scroll',()=>{
+    const pct = (window.scrollY/(document.documentElement.scrollHeight-window.innerHeight))*100;
+    bar.style.width = Math.min(pct,100)+'%';
+  },{passive:true});
+})();
+
+/* ══════════════════════════════════════════════════════
+   2. 3D PARTICLE NETWORK — hero background canvas
+══════════════════════════════════════════════════════ */
+(function initParticleNet(){
+  const hero = document.querySelector('.hero');
+  if(!hero) return;
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;';
+  hero.style.overflow='hidden';
+  hero.insertBefore(canvas, hero.firstChild);
+  const ctx = canvas.getContext('2d');
+  let W,H,particles=[],mouse={x:-999,y:-999};
+  const ACCENT='232,255,0';
+  const BLUE='0,240,255';
+
+  function resize(){
+    W=canvas.width=hero.offsetWidth;
+    H=canvas.height=hero.offsetHeight;
+  }
+
+  class P{
+    constructor(){this.reset();}
+    reset(){
+      this.x=Math.random()*W;
+      this.y=Math.random()*H;
+      this.z=Math.random();          // depth 0–1
+      this.vx=(Math.random()-.5)*0.5;
+      this.vy=(Math.random()-.5)*0.3;
+      this.r=0.8+this.z*1.8;
+      this.a=0.2+this.z*0.6;
+      this.color=Math.random()>.7?BLUE:ACCENT;
+    }
+    tick(){
+      const dx=this.x-mouse.x, dy=this.y-mouse.y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<140){const f=(140-d)/140*4;this.x+=dx/d*f;this.y+=dy/d*f;}
+      this.x+=this.vx; this.y+=this.vy;
+      if(this.x<0)this.x=W; if(this.x>W)this.x=0;
+      if(this.y<0)this.y=H; if(this.y>H)this.y=0;
+    }
+    draw(){
+      ctx.beginPath();
+      ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${this.color},${this.a})`;
+      ctx.fill();
+    }
+  }
+
+  function drawLines(){
+    for(let i=0;i<particles.length;i++){
+      for(let j=i+1;j<particles.length;j++){
+        const dx=particles[i].x-particles[j].x;
+        const dy=particles[i].y-particles[j].y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if(d<120){
+          const a=(1-d/120)*0.25;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x,particles[i].y);
+          ctx.lineTo(particles[j].x,particles[j].y);
+          ctx.strokeStyle=`rgba(${ACCENT},${a})`;
+          ctx.lineWidth=0.6;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p=>{p.tick();p.draw();});
+    drawLines();
+    requestAnimationFrame(frame);
+  }
+
+  hero.addEventListener('mousemove',e=>{
+    const r=canvas.getBoundingClientRect();
+    mouse.x=e.clientX-r.left; mouse.y=e.clientY-r.top;
+  },{passive:true});
+
+  window.addEventListener('resize',()=>{resize(); particles=Array.from({length:90},()=>new P());},{passive:true});
+  resize();
+  particles=Array.from({length:90},()=>new P());
+  frame();
+})();
+
+/* ══════════════════════════════════════════════════════
+   3. 3D CARD TILT — feature cards, float cards, testimonials
+══════════════════════════════════════════════════════ */
+function addTilt(els, strength=14){
+  els.forEach(el=>{
+    // Shine overlay
+    if(!el.querySelector('.card-shine')){
+      const s=document.createElement('div');
+      s.className='card-shine';
+      el.style.position='relative';
+      el.style.overflow='hidden';
+      el.appendChild(s);
+    }
+    el.addEventListener('mousemove',e=>{
+      const r=el.getBoundingClientRect();
+      const x=(e.clientX-r.left)/r.width -.5;
+      const y=(e.clientY-r.top) /r.height-.5;
+      el.style.transition='transform 0.08s ease';
+      el.style.transform=`perspective(900px) rotateX(${-y*strength}deg) rotateY(${x*strength}deg) translateZ(12px)`;
+      const shine=el.querySelector('.card-shine');
+      if(shine) shine.style.background=`radial-gradient(circle at ${(x+.5)*100}% ${(y+.5)*100}%,rgba(255,255,255,0.12) 0%,transparent 65%)`;
+    });
+    el.addEventListener('mouseleave',()=>{
+      el.style.transition='transform 0.7s cubic-bezier(0.23,1,0.32,1)';
+      el.style.transform='perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0)';
+      const shine=el.querySelector('.card-shine');
+      if(shine) shine.style.background='transparent';
+    });
+  });
+}
+
+// Wait for DOM
+window.addEventListener('load',()=>{
+  addTilt(document.querySelectorAll('.feature-card'), 10);
+  addTilt(document.querySelectorAll('.float-card'), 8);
+  addTilt(document.querySelectorAll('.testimonial-card'), 6);
+  addTilt(document.querySelectorAll('.step-card'), 8);
+});
+
+/* ══════════════════════════════════════════════════════
+   4. GLITCH on hero title
+══════════════════════════════════════════════════════ */
+(function(){
+  const title=document.querySelector('.hero-title');
+  if(!title) return;
+  const lines=title.querySelectorAll('span,br');
+  // Add glitch to accent line
+  const accent=title.querySelector('.line-accent');
+  if(accent){
+    accent.classList.add('glitch');
+    accent.setAttribute('data-text',accent.textContent);
+  }
+})();
+
+/* ══════════════════════════════════════════════════════
+   5. TEXT SCRAMBLE on hero eyebrow
+══════════════════════════════════════════════════════ */
+(function(){
+  const el=document.querySelector('.hero-eyebrow');
+  if(!el) return;
+  const original=el.textContent;
+  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$#@!';
+  let frame=0,total=60;
+  function tick(){
+    el.textContent=original.split('').map((c,i)=>{
+      if(c===' '||c==='.') return c;
+      if(frame/total > i/original.length) return c;
+      return chars[Math.floor(Math.random()*chars.length)];
+    }).join('');
+    if(frame++<total) requestAnimationFrame(tick);
+    else el.textContent=original;
+  }
+  setTimeout(tick,600);
+})();
+
+/* ══════════════════════════════════════════════════════
+   6. MAGNETIC BUTTONS
+══════════════════════════════════════════════════════ */
+(function(){
+  document.querySelectorAll('.btn-primary,.btn-secondary,.btn-nav-cta,.btn-nav-ghost').forEach(btn=>{
+    btn.addEventListener('mousemove',e=>{
+      const r=btn.getBoundingClientRect();
+      const x=e.clientX-r.left-r.width/2;
+      const y=e.clientY-r.top -r.height/2;
+      btn.style.transform=`translate(${x*.25}px,${y*.25}px)`;
+    });
+    btn.addEventListener('mouseleave',()=>{
+      btn.style.transform='translate(0,0)';
+    });
+  });
+})();
+
+/* ══════════════════════════════════════════════════════
+   7. FLOATING PRICE ORBS in hero
+══════════════════════════════════════════════════════ */
+(function(){
+  const hero=document.querySelector('.hero');
+  if(!hero) return;
+  const orbs=[
+    {label:'$289',x:72,y:20,dur:7,color:'rgba(232,255,0,0.12)'},
+    {label:'$11.2K',x:80,y:55,dur:9,color:'rgba(0,240,255,0.10)'},
+    {label:'-5.2%',x:15,y:65,dur:8,color:'rgba(255,60,60,0.10)'},
+    {label:'$320',x:60,y:80,dur:6,color:'rgba(232,255,0,0.08)'},
+    {label:'HOT🔥',x:88,y:30,dur:11,color:'rgba(255,140,0,0.10)'},
+  ];
+  orbs.forEach(o=>{
+    const el=document.createElement('div');
+    el.className='hero-orb';
+    el.textContent=o.label;
+    el.style.cssText=`
+      left:${o.x}%;top:${o.y}%;
+      width:72px;height:72px;
+      background:${o.color};
+      border:1px solid rgba(232,255,0,0.2);
+      backdrop-filter:blur(4px);
+      display:flex;align-items:center;justify-content:center;
+      font-family:'Space Mono',monospace;font-size:11px;font-weight:700;
+      color:#e8ff00;letter-spacing:1px;
+      animation-duration:${o.dur}s;
+      z-index:2;
+    `;
+    hero.appendChild(el);
+  });
+})();
+
+/* ══════════════════════════════════════════════════════
+   8. PARTICLE BURST utility (reusable)
+══════════════════════════════════════════════════════ */
+window.particleBurst=function(x,y,color='#e8ff00'){
+  for(let i=0;i<20;i++){
+    const p=document.createElement('div');
+    const angle=(i/20)*Math.PI*2;
+    const spd=50+Math.random()*80;
+    const sz=2+Math.random()*4;
+    p.style.cssText=`position:fixed;left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;background:${color};border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%)`;
+    document.body.appendChild(p);
+    let t=0;
+    const dx=Math.cos(angle)*spd, dy=Math.sin(angle)*spd;
+    (function anim(){
+      t+=0.04;
+      p.style.left=(x+dx*t)+'px';
+      p.style.top=(y+dy*t+120*t*t)+'px';
+      p.style.opacity=String(1-t);
+      p.style.transform=`translate(-50%,-50%) scale(${1-t})`;
+      if(t<1) requestAnimationFrame(anim); else p.remove();
+    })();
+  }
+};
+
+// Burst on CTA clicks
+document.querySelectorAll('.btn-primary').forEach(btn=>{
+  btn.addEventListener('click',e=>{
+    window.particleBurst(e.clientX,e.clientY,'#e8ff00');
+  });
+});
+
+/* ══════════════════════════════════════════════════════
+   9. BRAND PILL infinite scroll speed-up on hover
+══════════════════════════════════════════════════════ */
+(function(){
+  const row=document.querySelector('.brands-row');
+  if(!row) return;
+  row.addEventListener('mouseenter',()=>{row.style.animationPlayState='paused';});
+  row.addEventListener('mouseleave',()=>{row.style.animationPlayState='running';});
+})();
+
+/* ══════════════════════════════════════════════════════
+   10. COUNTER — slot-machine flip animation
+══════════════════════════════════════════════════════ */
+(function(){
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(!e.isIntersecting) return;
+      obs.unobserve(e.target);
+      const el=e.target;
+      const target=parseInt(el.dataset.target);
+      const suffix=el.dataset.suffix||'';
+      let cur=0, steps=60;
+      const inc=target/steps;
+      const iv=setInterval(()=>{
+        cur=Math.min(cur+inc, target);
+        el.textContent=(target>=1000?Math.round(cur/1000)+'K':Math.round(cur))+suffix;
+        if(cur>=target){clearInterval(iv);el.textContent=(target>=1000?(target/1000)+'K':target)+suffix;}
+      },25);
+    });
+  },{threshold:0.5});
+  document.querySelectorAll('.stat-num[data-target]').forEach(el=>obs.observe(el));
+})();
+</script>
 </body>
 </html>
