@@ -1467,7 +1467,7 @@ async function loadTrendingImages(items) {
   // Resolve API base lazily — api-connector.js may not be loaded yet when renderTrending is first called
   const getBase = () => (typeof API_BASE !== 'undefined')
     ? API_BASE
-    : `http://${window.location.hostname}:3000/api`;
+    : `http://${window.location.hostname}:3001/api`;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const wrap = document.getElementById(`trend-img-${i}`);
@@ -1586,7 +1586,7 @@ ticker.innerHTML = buildTickerHTML(_tickerStatic) + buildTickerHTML(_tickerStati
 // Fetch live prices for ticker — runs in background, replaces static data when done
 (async function fetchLiveTicker() {
   const queries = ['Nike Air Jordan 1','Rolex Submariner','Adidas Yeezy Boost 350','Louis Vuitton Neverfull','Nike Dunk Low Panda'];
-  const base = (typeof API_BASE !== 'undefined') ? API_BASE : `http://${location.hostname}:3000/api`;
+  const base = (typeof API_BASE !== 'undefined') ? API_BASE : `http://${location.hostname}:3001/api`;
   try {
     const results = await Promise.all(
       queries.map(q =>
@@ -1702,7 +1702,7 @@ renderStaticProducts('all');
 // ─────────────────────────────────────────────────────────────────────
 // LIVE SEARCH — calls backend /api/prices and renders results
 // ─────────────────────────────────────────────────────────────────────
-const _API_BASE = `http://${location.hostname}:3000/api`;
+const _API_BASE = `http://${location.hostname}:3001/api`;
 
 async function searchLivePrices(query) {
   if (!query || !query.trim()) return;
@@ -1734,7 +1734,22 @@ async function searchLivePrices(query) {
 
     renderLiveResults(results);
     if (clearBtn) clearBtn.style.display = 'block';
-    if (countEl)  countEl.textContent = results.length ? `${results.length} source${results.length > 1 ? 's' : ''} found` : '';
+
+    // Show sources breakdown + cache indicator
+    if (countEl && results.length) {
+      const priceResults = results.filter(r => r.price && !r.browse);
+      const browseResults = results.filter(r => r.browse);
+      const sources = [...new Set(priceResults.map(r => r.source))];
+      const cacheNote = data.cached ? ` · cached ${data.cacheAge}m ago` : '';
+      if (priceResults.length) {
+        countEl.textContent = `${priceResults.length} live price${priceResults.length > 1 ? 's' : ''}: ${sources.join(', ')}${browseResults.length ? ` + ${browseResults.length} more retailers` : ''}${cacheNote}`;
+      } else {
+        countEl.textContent = `${browseResults.length} retailers to browse${cacheNote}`;
+      }
+    } else if (countEl) {
+      countEl.textContent = '';
+    }
+
     if (typeof _updateTimestampBar === 'function') _updateTimestampBar();
     if (typeof showSavingsBanner   === 'function') showSavingsBanner(results);
 
@@ -1769,7 +1784,24 @@ function renderLiveResults(results) {
 
   const query = window._lastQuery || '';
 
-  grid.innerHTML = results.map((r, i) => {
+  // Separate real-price results from browse links
+  const priceResults  = results.filter(r => r.price && !r.browse);
+  const browseResults = results.filter(r => r.browse);
+
+  // Source icons for known retailers
+  const SOURCE_ICONS = {
+    'stockx':'🟢','goat':'🐐','nike':'✔️','foot locker':'👟','finish line':'🏁',
+    'adidas':'🔷','zappos':'⚡','jd sports':'🎽','amazon':'📦','ebay':'🏪',
+    'chrono24':'⌚','watchbox':'💎','farfetch':'👜','vestiaire':'✨','the realreal':'💼',
+  };
+  function srcIcon(src) {
+    const key = (src||'').toLowerCase();
+    for (const [k, v] of Object.entries(SOURCE_ICONS)) { if (key.includes(k)) return v; }
+    return '🛍️';
+  }
+
+  // Render real-price cards + browse cards
+  const priceHtml = priceResults.map((r, i) => {
     const price       = typeof formatPrice === 'function' ? formatPrice(r.price) : ('$' + r.price);
     const isVerified  = r.verified !== false;
     const isSuspicious = r.suspicious;
@@ -1786,7 +1818,6 @@ function renderLiveResults(results) {
              onmouseover="this.style.background='var(--accent)';this.style.color='var(--black)'"
              onmouseout="this.style.background='var(--grey-700)';this.style.color='var(--accent)'">Shop →</a>`
       : '';
-    // Safely escape for inline JS
     const safeTitle  = titleText.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     const safeSource = (r.source||'').replace(/'/g,"\\'");
     const safeUrl    = (r.url||'').replace(/'/g,"\\'");
@@ -1820,6 +1851,29 @@ function renderLiveResults(results) {
       </div>`;
   }).join('');
 
+  // Browse-link cards — shown when APIs have no live prices
+  const browseHeader = browseResults.length ? `
+    <div style="grid-column:1/-1;padding:16px 0 8px;border-top:1px solid var(--grey-700);margin-top:8px;
+                font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400)">
+      ALSO SEARCH ON →
+    </div>` : '';
+
+  const browseHtml = browseResults.map(r => `
+    <a href="${r.url}" target="_blank" rel="noopener noreferrer"
+       style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+              background:var(--grey-800);border:1px solid var(--grey-700);padding:28px 16px;
+              text-decoration:none;transition:all 0.25s;min-height:160px;cursor:pointer"
+       onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--grey-700)'"
+       onmouseout="this.style.borderColor='var(--grey-700)';this.style.background='var(--grey-800)'">
+      <div style="font-size:36px">${srcIcon(r.source)}</div>
+      <div style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;
+                  color:var(--grey-100);text-transform:uppercase;text-align:center">${r.source}</div>
+      <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;
+                  color:var(--accent);border:1px solid var(--accent);padding:4px 12px">Browse →</div>
+    </a>`).join('');
+
+  grid.innerHTML = priceHtml + browseHeader + browseHtml;
+
   refreshCursor();
 }
 
@@ -1846,12 +1900,14 @@ function sortProducts(type, btn) {
   if (btn) btn.classList.add('active');
 
   if (window._lastResults && window._lastResults.length) {
-    // Sort live results
-    const sorted = [...window._lastResults].filter(r => r && r.price);
-    if (type === 'price-asc')  sorted.sort((a, b) => a.price - b.price);
-    if (type === 'price-desc') sorted.sort((a, b) => b.price - a.price);
-    if (type === 'hot')        sorted.sort((a, b) => (b.verified ? 1 : 0) - (a.verified ? 1 : 0));
-    if (type === 'drop')       sorted.sort((a, b) => a.price - b.price); // cheapest first for live
+    // Sort live results (keep browse links at end, unsorted)
+    const priced  = [...window._lastResults].filter(r => r && r.price && !r.browse);
+    const browse  = window._lastResults.filter(r => r.browse);
+    if (type === 'price-asc')  priced.sort((a, b) => a.price - b.price);
+    if (type === 'price-desc') priced.sort((a, b) => b.price - a.price);
+    if (type === 'hot')        priced.sort((a, b) => (b.verified ? 1 : 0) - (a.verified ? 1 : 0));
+    if (type === 'drop')       priced.sort((a, b) => a.price - b.price);
+    const sorted = [...priced, ...browse];
     window._lastResults = sorted;
     renderLiveResults(sorted);
   } else {
@@ -2591,7 +2647,7 @@ function loadNotifications() {
   // Also try to pull server-side alerts that fired
   if (token) {
     const apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? `http://${window.location.hostname}:3000/api`
+      ? `http://${window.location.hostname}:3001/api`
       : `${window.location.origin}/api`;
     fetch(apiBase.replace('/api', '/auth') + '/alerts', {
       headers: { Authorization: `Bearer ${token}` }

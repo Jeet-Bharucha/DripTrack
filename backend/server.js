@@ -9,7 +9,7 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'driptrack_secret_key_change_in_production';
 
 app.use(cors());
@@ -365,7 +365,13 @@ app.post('/auth/reset-password', async (req, res) => {
 // GOOGLE OAUTH 2.0
 // Redirect flow — no Passport needed
 // ─────────────────────────────────────────────
-const GOOGLE_REDIRECT_URI = `http://localhost:${PORT}/auth/google/callback`;
+// Use env var in production, fallback to localhost for dev
+function getGoogleRedirectUri(req) {
+  if (process.env.GOOGLE_REDIRECT_URI) return process.env.GOOGLE_REDIRECT_URI;
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const host  = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`;
+  return `${proto}://${host}/auth/google/callback`;
+}
 
 app.get('/auth/google', (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
@@ -373,7 +379,7 @@ app.get('/auth/google', (req, res) => {
   }
   const params = new URLSearchParams({
     client_id:     process.env.GOOGLE_CLIENT_ID,
-    redirect_uri:  GOOGLE_REDIRECT_URI,
+    redirect_uri:  getGoogleRedirectUri(req),
     response_type: 'code',
     scope:         'openid email profile',
     access_type:   'offline',
@@ -392,7 +398,7 @@ app.get('/auth/google/callback', async (req, res) => {
       code,
       client_id:     process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri:  GOOGLE_REDIRECT_URI,
+      redirect_uri:  getGoogleRedirectUri(req),
       grant_type:    'authorization_code',
     });
     const { access_token } = tokenRes.data;
@@ -504,6 +510,63 @@ app.delete('/auth/account', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// ─────────────────────────────────────────────
+// SEARCH RESULTS CACHE — saves API credits
+// Results cached for 1 hour in MongoDB + in-memory fallback
+// ─────────────────────────────────────────────
+const searchCacheSchema = new mongoose.Schema({
+  query:     { type: String, required: true, unique: true, index: true },
+  results:   { type: mongoose.Schema.Types.Mixed },
+  bestPrice: { type: mongoose.Schema.Types.Mixed },
+  cachedAt:  { type: Date, default: Date.now },
+});
+const SearchCache = mongoose.model('SearchCache', searchCacheSchema);
+
+// In-memory cache (key = normalized query, value = { results, bestPrice, cachedAt })
+const memSearchCache = {};
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function normalizeQuery(q) { return q.toLowerCase().trim().replace(/\s+/g, ' '); }
+
+async function getCachedSearch(query) {
+  const key = normalizeQuery(query);
+  // Check in-memory first (fastest)
+  if (memSearchCache[key] && Date.now() - memSearchCache[key].cachedAt < CACHE_TTL_MS) {
+    console.log(`  💾 Cache HIT (memory): "${query}"`);
+    return memSearchCache[key];
+  }
+  // Check MongoDB
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const doc = await SearchCache.findOne({ query: key });
+      if (doc && Date.now() - doc.cachedAt.getTime() < CACHE_TTL_MS) {
+        console.log(`  💾 Cache HIT (DB): "${query}"`);
+        const cached = { results: doc.results, bestPrice: doc.bestPrice, cachedAt: doc.cachedAt.getTime() };
+        memSearchCache[key] = cached; // warm the memory cache
+        return cached;
+      }
+    }
+  } catch (e) { /* ignore cache errors */ }
+  return null;
+}
+
+async function setCachedSearch(query, results, bestPrice) {
+  const key = normalizeQuery(query);
+  const now = Date.now();
+  // Store in memory
+  memSearchCache[key] = { results, bestPrice, cachedAt: now };
+  // Store in MongoDB (upsert)
+  try {
+    if (mongoose.connection.readyState === 1) {
+      await SearchCache.findOneAndUpdate(
+        { query: key },
+        { results, bestPrice, cachedAt: new Date(now) },
+        { upsert: true, new: true }
+      );
+    }
+  } catch (e) { /* ignore cache write errors */ }
+}
 
 // ─────────────────────────────────────────────
 // PRICE HISTORY — persisted in MongoDB
@@ -763,6 +826,16 @@ async function getGoogleShoppingPrices(searchTerm) {
       params: { engine:'google_shopping', q:searchTerm, api_key:process.env.SERPAPI_KEY, num:20 },
       timeout: 10000,
     });
+
+    // Detect credit exhaustion or API-level errors in the body
+    if (res.data.error) {
+      console.error('  ❌ SerpAPI API error:', res.data.error);
+      if (/credit|plan|limit|quota|usage/i.test(res.data.error)) {
+        console.error('  ⚠️  SerpAPI credits exhausted — upgrade at serpapi.com or wait for monthly reset');
+      }
+      return [];
+    }
+
     const raw     = res.data.shopping_results || [];
     const trusted = raw.filter(r => isTrustedRetailer(r.source));
     // Use trusted sources first; fall back to all results if no trusted found
@@ -781,19 +854,80 @@ async function getGoogleShoppingPrices(searchTerm) {
     console.log(`  🔍 SerpAPI raw: ${raw.length} total, ${trusted.length} trusted, ${clean.length} after filter → ${mapped.length} returned`);
     return mapped;
   } catch (err) {
-    console.error('  ❌ SerpAPI error:', err.response?.status, err.response?.data?.error || err.message);
+    const status = err.response?.status;
+    const msg    = err.response?.data?.error || err.message;
+    console.error(`  ❌ SerpAPI error [HTTP ${status||'?'}]:`, msg);
+    if (status === 429) console.error('  ⚠️  SerpAPI rate limited — too many requests');
+    if (status === 401) console.error('  ⚠️  SerpAPI invalid API key — check SERPAPI_KEY in .env');
     return [];
   }
+}
+
+// ─────────────────────────────────────────────
+// FALLBACK RETAILER LINKS
+// When APIs return nothing, generate search links for major retailers
+// so users always have somewhere to shop
+// ─────────────────────────────────────────────
+function getSneakerRetailers(query) {
+  const q = query.toLowerCase();
+  const isSneaker  = /nike|jordan|yeezy|dunk|adidas|new balance|puma|asics|converse|vans/i.test(q) || !/(watch|handbag|bag|gucci|rolex|omega|prada|chanel|lv |louis)/i.test(q);
+  const isWatch    = /watch|rolex|omega|seiko|casio|tissot|longines|tag heuer|patek/i.test(q);
+  const isLuxury   = /gucci|prada|chanel|louis vuitton|hermes|burberry|versace/i.test(q);
+
+  if (isWatch) {
+    return [
+      { source: 'Chrono24',    url: `https://www.chrono24.com/search/index.htm?query=${encodeURIComponent(query)}`, price: null, browse: true },
+      { source: 'WatchBox',    url: `https://www.watchbox.com/collections/all?q=${encodeURIComponent(query)}`,    price: null, browse: true },
+      { source: 'eBay Watches',url: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&_sacat=31387`, price: null, browse: true },
+    ];
+  }
+  if (isLuxury) {
+    return [
+      { source: 'Farfetch',    url: `https://www.farfetch.com/shopping/men/search/items.aspx?q=${encodeURIComponent(query)}`, price: null, browse: true },
+      { source: 'Vestiaire',   url: `https://www.vestiairecollective.com/search/?q=${encodeURIComponent(query)}`, price: null, browse: true },
+      { source: 'The RealReal',url: `https://www.therealreal.com/search?q=${encodeURIComponent(query)}`,          price: null, browse: true },
+    ];
+  }
+  // Default: sneakers / streetwear
+  return [
+    { source: 'StockX',     url: `https://stockx.com/search?s=${encodeURIComponent(query)}`,                          price: null, browse: true },
+    { source: 'GOAT',       url: `https://www.goat.com/search?query=${encodeURIComponent(query)}`,                    price: null, browse: true },
+    { source: 'Nike',       url: `https://www.nike.com/search/results/?q=${encodeURIComponent(query)}`,               price: null, browse: true },
+    { source: 'Foot Locker',url: `https://www.footlocker.com/search?query=${encodeURIComponent(query)}`,              price: null, browse: true },
+    { source: 'Finish Line',url: `https://www.finishline.com/store/search?query=${encodeURIComponent(query)}`,        price: null, browse: true },
+    { source: 'Adidas',     url: `https://www.adidas.com/us/search?q=${encodeURIComponent(query)}`,                   price: null, browse: true },
+    { source: 'Zappos',     url: `https://www.zappos.com/search/term/${encodeURIComponent(query)}`,                   price: null, browse: true },
+    { source: 'JD Sports',  url: `https://www.jdsports.com/search/?q=${encodeURIComponent(query)}`,                   price: null, browse: true },
+  ];
 }
 
 // ─────────────────────────────────────────────
 // PRICE ROUTES
 // ─────────────────────────────────────────────
 app.get('/api/prices', async (req, res) => {
-  const { q } = req.query;
+  const { q, nocache } = req.query;
   if (!q) return res.status(400).json({ error: 'Missing ?q=' });
   console.log(`\n🔍 Searching: "${q}"`);
 
+  // ── Check cache first (skip with ?nocache=1 for debugging)
+  if (!nocache) {
+    const cached = await getCachedSearch(q);
+    if (cached) {
+      const ageMin = Math.round((Date.now() - cached.cachedAt) / 60000);
+      console.log(`✅ ${cached.results.length} results (from cache, ${ageMin}m old)`);
+      return res.json({
+        query: q,
+        timestamp: new Date().toISOString(),
+        results: cached.results,
+        bestPrice: cached.bestPrice || null,
+        totalSources: cached.results.length,
+        cached: true,
+        cacheAge: ageMin,
+      });
+    }
+  }
+
+  // ── Live API calls
   const [amazon, ebay, googleResults] = await Promise.all([
     getAmazonPrice(q),
     getEbayPrice(q),
@@ -813,18 +947,34 @@ app.get('/api/prices', async (req, res) => {
   const deduped  = deduplicateBySource(combined);
   const checked  = authenticityCheck(deduped);
 
+  // ── If we got very few real results (only eBay or nothing), add browse links
+  // so users always see relevant retailers — marked as browse: true (no price shown)
+  const realResults = checked.filter(r => r.price);
+  const nonEbayReal = realResults.filter(r => r.source !== 'eBay');
+  if (nonEbayReal.length === 0) {
+    const browseLinks = getSneakerRetailers(q);
+    console.log(`  🔗 Added ${browseLinks.length} fallback browse links (APIs returned no non-eBay results)`);
+    checked.push(...browseLinks);
+  }
+
   // Find best quality image: Amazon > eBay > SerpAPI (in that order)
   const bestImage = amazon?.image || ebay?.image || googleResults.find(r => r?.image)?.image || null;
 
-  // Apply best image to any result that has no image
+  // Apply best image to real-price results that lack one (not browse links)
   const enriched = checked.map(r => ({
     ...r,
-    image: (r.image && r.image.startsWith('http')) ? r.image : bestImage,
+    image: r.browse ? null : ((r.image && r.image.startsWith('http')) ? r.image : bestImage),
   }));
 
   const lowestPrice = enriched.filter(p=>!p.suspicious&&p.price).sort((a,b)=>a.price-b.price)[0];
   if (lowestPrice) savePriceHistory(q.toLowerCase().replace(/\s+/g,'-'), lowestPrice.price, lowestPrice.source);
-  console.log(`✅ ${enriched.length} results`);
+
+  // ── Save to cache (only if we got results)
+  if (enriched.length > 0) {
+    await setCachedSearch(q, enriched, lowestPrice || null);
+  }
+
+  console.log(`✅ ${enriched.length} results (fresh from APIs)`);
   res.json({ query:q, timestamp:new Date().toISOString(), results:enriched, bestPrice:lowestPrice||null, totalSources:enriched.length });
 });
 
@@ -849,7 +999,29 @@ app.get('/api/status', (req, res) => {
     serpapi: process.env.SERPAPI_KEY ? '✅ Connected' : '❌ Missing key',
     mongodb: mongoose.connection.readyState === 1 ? '✅ Connected' : '❌ Not connected',
     email: process.env.GMAIL_USER ? '✅ Configured' : '⚠️ Not configured',
+    cache: `${Object.keys(memSearchCache).length} queries in memory cache`,
   }});
+});
+
+// Cache management — see what's cached or clear it
+app.get('/api/cache', async (req, res) => {
+  const keys = Object.keys(memSearchCache).map(k => ({
+    query: k,
+    results: memSearchCache[k].results?.length || 0,
+    ageMin: Math.round((Date.now() - memSearchCache[k].cachedAt) / 60000),
+    sources: [...new Set((memSearchCache[k].results||[]).map(r=>r.source))].join(', '),
+  }));
+  res.json({ cached: keys, total: keys.length, ttlHours: 1 });
+});
+
+app.delete('/api/cache', async (req, res) => {
+  const count = Object.keys(memSearchCache).length;
+  for (const k of Object.keys(memSearchCache)) delete memSearchCache[k];
+  try {
+    if (mongoose.connection.readyState === 1) await SearchCache.deleteMany({});
+  } catch (e) {}
+  console.log(`🗑️  Cache cleared (${count} entries)`);
+  res.json({ cleared: count });
 });
 
 app.get('/api/image', async (req, res) => {

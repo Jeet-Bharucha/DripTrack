@@ -343,7 +343,7 @@ async function handleLogin() {
   btnText.textContent = 'Signing in...';
 
   const AUTH_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? `http://${window.location.hostname}:3000/auth`
+    ? `http://${window.location.hostname}:3001/auth`
     : `${window.location.origin}/auth`;
 
   try {
@@ -397,7 +397,7 @@ async function forgotPassword(e) {
   link.style.color = 'var(--accent)';
 
   const _authBase2 = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? `http://${window.location.hostname}:3000/auth`
+    ? `http://${window.location.hostname}:3001/auth`
     : `${window.location.origin}/auth`;
 
   try {
@@ -443,7 +443,7 @@ function socialLogin(provider) {
   if (provider === 'Google') {
     // Redirect to backend Google OAuth route
     const AUTH_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      ? `http://${window.location.hostname}:3000/auth`
+      ? `http://${window.location.hostname}:3001/auth`
       : `${window.location.origin}/auth`;
     window.location.href = `${AUTH_BASE}/google`;
   } else if (provider === 'Apple') {

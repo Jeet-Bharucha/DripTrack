@@ -391,7 +391,7 @@ async function handleRegister() {
   btnText.textContent = 'Creating account...';
 
   const AUTH_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? `http://${window.location.hostname}:3000/auth/register`
+    ? `http://${window.location.hostname}:3001/auth/register`
     : `${window.location.origin}/auth/register`;
 
   try {
@@ -435,7 +435,7 @@ document.addEventListener('keydown', e => {
 // ─── GOOGLE OAUTH ───
 function googleRegister() {
   const AUTH_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? `http://${window.location.hostname}:3000/auth`
+    ? `http://${window.location.hostname}:3001/auth`
     : `${window.location.origin}/auth`;
   window.location.href = `${AUTH_BASE}/google`;
 }

@@ -457,7 +457,7 @@ function showTab(name, btn) {
 // ── SAVINGS DASHBOARD
 function loadSavings() {
   const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? `http://${window.location.hostname}:3000/api`
+    ? `http://${window.location.hostname}:3001/api`
     : `${window.location.origin}/api`;
 
   // Load recorded savings from localStorage
@@ -675,7 +675,7 @@ function syncAlertsToServer(watchlist, alerts) {
       productName: item.title || item.name || '',
     };
   });
-  fetch('http://localhost:3000/auth/price-alerts', {
+  fetch('http://localhost:3001/auth/price-alerts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({ alerts: serverAlerts }),
@@ -746,7 +746,7 @@ async function saveProfile() {
   if (!firstName || !lastName) return alert('Please fill in all fields');
 
   try {
-    const res = await fetch('http://localhost:3000/auth/update-profile', {
+    const res = await fetch('http://localhost:3001/auth/update-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ firstName, lastName }),
@@ -780,7 +780,7 @@ async function changePassword() {
   if (newPass !== confirm) return alert('New passwords do not match');
 
   try {
-    const res = await fetch('http://localhost:3000/auth/change-password', {
+    const res = await fetch('http://localhost:3001/auth/change-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ currentPassword: current, newPassword: newPass }),
@@ -805,7 +805,7 @@ async function deleteAccount() {
   if (confirm('Are you sure? This cannot be undone. All your data will be permanently deleted.')) {
     if (confirm('Last chance — are you absolutely sure?')) {
       try {
-        await fetch('http://localhost:3000/auth/account', {
+        await fetch('http://localhost:3001/auth/account', {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` },
         });

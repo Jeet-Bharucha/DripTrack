@@ -101,7 +101,7 @@ document.addEventListener('mouseover',e=>{if(e.target.closest('button,a,input'))
 
 <script>
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? `http://${window.location.hostname}:3000/api` : `${window.location.origin}/api`;
+  ? `http://${window.location.hostname}:3001/api` : `${window.location.origin}/api`;
 const AUTH_BASE = API_BASE.replace('/api', '/auth');
 
 const savedTheme = localStorage.getItem('driptrack_theme');
