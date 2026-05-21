@@ -1802,6 +1802,8 @@ function renderLiveResults(results) {
 
   // Render real-price cards + browse cards
   const priceHtml = priceResults.map((r, i) => {
+    // Use the real index in window._lastResults to avoid mismatch with browse links
+    const realIndex = results.indexOf(r);
     const price       = typeof formatPrice === 'function' ? formatPrice(r.price) : ('$' + r.price);
     const isVerified  = r.verified !== false;
     const isSuspicious = r.suspicious;
@@ -1823,7 +1825,7 @@ function renderLiveResults(results) {
     const safeUrl    = (r.url||'').replace(/'/g,"\\'");
     const safeImg    = (r.image||'').replace(/'/g,"\\'");
     return `
-      <div class="product-card" style="animation-delay:${i*0.07}s" onclick="openLivePanel(${i})">
+      <div class="product-card" style="animation-delay:${i*0.07}s" onclick="openLivePanel(${realIndex})">
         <div class="card-img-wrap">
           ${imgHtml}
           ${isSuspicious ? '<span class="card-badge" style="left:auto;right:12px;background:#ff3c3c;color:#fff;font-size:8px">⚠️ Suspicious</span>' : ''}
@@ -2104,11 +2106,76 @@ function openStaticPanel(id) {
     <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
   `;
 
-  // Fetch real multi-angle images via api-connector
-  if (typeof loadAnglesForPanel === 'function') {
-    const searchTerm = p.brand + ' ' + p.name + ' ' + p.color;
-    loadAnglesForPanel(searchTerm, p.emoji);
-  }
+  // ── Fetch live prices in background and update panel with real data
+  const liveQuery = p.brand + ' ' + p.name;
+  document.getElementById('panelPriceSub').textContent = '⟳ Fetching live prices...';
+  document.getElementById('panelPriceSub').style.color = 'var(--grey-400)';
+
+  fetch(`${_API_BASE}/prices?q=${encodeURIComponent(liveQuery)}`)
+    .then(r => r.json())
+    .then(data => {
+      // Make sure this panel is still showing this same product
+      if (document.getElementById('panelTitle')?.textContent !== p.name) return;
+      const results = (data.results||[]).filter(r => r && r.price && !r.browse);
+      if (!results.length) {
+        document.getElementById('panelPriceSub').textContent = `Static price · Live data unavailable`;
+        document.getElementById('panelPriceSub').style.color = 'var(--grey-400)';
+        return;
+      }
+      // Update price to live best price
+      const best = results.sort((a,b) => a.price - b.price)[0];
+      const liveFmt = best.price >= 1000 ? '$'+(best.price/1000).toFixed(1)+'K' : '$'+best.price.toFixed(2);
+      document.getElementById('panelPrice').textContent = liveFmt;
+      document.getElementById('panelPriceSub').textContent = `✓ Live price from ${best.source}`;
+      document.getElementById('panelPriceSub').style.color = 'var(--up)';
+
+      // Update sources panel with live data
+      const sorted = [...results].sort((a,b) => a.price - b.price);
+      document.getElementById('panelSources').innerHTML = sorted.map((r,i) => {
+        const url = r.url && r.url !== 'undefined' ? r.url : null;
+        return url ? `
+          <a href="${url}" target="_blank" rel="noopener noreferrer"
+             class="panel-source-link ${i===0?'best-source':''}">
+            <div class="source-link-left">
+              <div class="source-link-name ${i===0?'best':''}">${r.source}</div>
+              <div class="source-link-tag">${i===0?'⭐ Best Price · ':''}Click to shop →</div>
+            </div>
+            <div class="source-link-right">
+              <div class="source-link-price" style="color:${i===0?'var(--up)':'var(--white)'}">$${r.price.toFixed(2)}</div>
+              <div class="source-link-arrow">SHOP →</div>
+            </div>
+          </a>` : '';
+      }).join('');
+
+      // Update chart with live price comparison
+      const prices = sorted.map(r => r.price);
+      if (prices.length >= 2) {
+        const w=360,h=100,pad=8;
+        const min=Math.min(...prices)*0.95, max=Math.max(...prices)*1.05;
+        const coords=prices.map((v,ci)=>{
+          const x=pad+(ci/(prices.length-1))*(w-pad*2);
+          const y=h-pad-((v-min)/(max-min||1))*(h-pad*2);
+          return [x,y];
+        });
+        const line='M '+coords.map(c=>c.join(',')).join(' L ');
+        const area=line+` L ${coords[coords.length-1][0]},${h} L ${coords[0][0]},${h} Z`;
+        document.getElementById('panelChartSvg').innerHTML=`
+          <defs><linearGradient id="pgs${p.id}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--up)" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="var(--up)" stop-opacity="0"/>
+          </linearGradient></defs>
+          <path d="${area}" fill="url(#pgs${p.id})"/>
+          <path d="${line}" fill="none" stroke="var(--up)" stroke-width="2" stroke-linecap="round"/>
+          ${coords.map(c=>`<circle cx="${c[0]}" cy="${c[1]}" r="3" fill="var(--up)" opacity="0.8"/>`).join('')}`;
+      }
+    })
+    .catch(() => {
+      // If API fails, keep the static price shown — just update the sub text
+      if (document.getElementById('panelTitle')?.textContent === p.name) {
+        document.getElementById('panelPriceSub').textContent = `Static price · ${Math.abs(p.change)}% ${p.change >= 0 ? 'up' : 'down'} this month`;
+        document.getElementById('panelPriceSub').style.color = p.change >= 0 ? 'var(--up)' : 'var(--down)';
+      }
+    });
 }
 
 // Switch angle thumbnail view
@@ -2189,26 +2256,81 @@ function openLivePanel(index) {
     </div>
   `).join('');
 
-  const prices=sorted.map(r=>r.price);
-  if (prices.length>1) {
-    const w=360,h=100,pad=8;
-    const min=Math.min(...prices)*0.95, max=Math.max(...prices)*1.05;
-    const coords=prices.map((v,i)=>{
-      const x=pad+(i/(prices.length-1))*(w-pad*2);
-      const y=h-pad-((v-min)/(max-min||1))*(h-pad*2);
-      return [x,y];
-    });
-    const line='M '+coords.map(c=>c.join(',')).join(' L ');
-    const area=line+` L ${coords[coords.length-1][0]},${h} L ${coords[0][0]},${h} Z`;
-    document.getElementById('panelChartSvg').innerHTML=`
-      <defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="var(--up)" stop-opacity="0.3"/>
-        <stop offset="100%" stop-color="var(--up)" stop-opacity="0"/>
-      </linearGradient></defs>
-      <path d="${area}" fill="url(#pg)"/>
-      <path d="${line}" fill="none" stroke="var(--up)" stroke-width="2" stroke-linecap="round"/>
-      ${coords.map(c=>`<circle cx="${c[0]}" cy="${c[1]}" r="3" fill="var(--up)" opacity="0.8"/>`).join('')}
-    `;
+  // Show a loading placeholder while we fetch real price history
+  const chartEl = document.getElementById('panelChartSvg');
+  chartEl.innerHTML = `<text x="50%" y="50%" text-anchor="middle" fill="#555"
+    font-family="Space Mono,monospace" font-size="10" letter-spacing="2">LOADING HISTORY...</text>`;
+
+  // Fetch real price history for this specific product
+  const historyQuery = item.title || window._lastQuery || '';
+  if (historyQuery) {
+    fetch(`${_API_BASE}/history?q=${encodeURIComponent(historyQuery)}`)
+      .then(r => r.json())
+      .then(data => {
+        // Make sure panel is still showing this same item
+        if (!document.getElementById('detailPanel')?.classList.contains('open')) return;
+        if (document.getElementById('panelTitle')?.textContent !== (item.title||'Product').slice(0,45)+'...') return;
+
+        const pts = (data.history||[]).map(h => h.price).filter(Boolean);
+
+        if (pts.length >= 2) {
+          // Draw real history chart
+          const w=360,h=100,pad=8;
+          const min=Math.min(...pts)*0.95, max=Math.max(...pts)*1.05;
+          const coords=pts.map((v,i)=>{
+            const x=pad+(i/(pts.length-1))*(w-pad*2);
+            const y=h-pad-((v-min)/(max-min||1))*(h-pad*2);
+            return [x,y];
+          });
+          const first=pts[0], last=pts[pts.length-1];
+          const isUp = last >= first;
+          const color = isUp ? 'var(--up)' : 'var(--down)';
+          const line='M '+coords.map(c=>c.join(',')).join(' L ');
+          const area=line+` L ${coords[coords.length-1][0]},${h} L ${coords[0][0]},${h} Z`;
+          chartEl.innerHTML=`
+            <defs><linearGradient id="pg${index}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+            </linearGradient></defs>
+            <path d="${area}" fill="url(#pg${index})"/>
+            <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+            ${coords.map(c=>`<circle cx="${c[0]}" cy="${c[1]}" r="3" fill="${color}" opacity="0.8"/>`).join('')}
+          `;
+          // Update price sub to show trend
+          const pct = ((last-first)/first*100).toFixed(1);
+          document.getElementById('panelPriceSub').textContent = `${isUp?'▲':'▼'}${Math.abs(pct)}% trend · ${data.dataPoints} data points`;
+          document.getElementById('panelPriceSub').style.color = isUp ? 'var(--up)' : 'var(--down)';
+        } else {
+          // Only 1 data point or none — show current price as a flat line
+          const color = 'var(--up)';
+          chartEl.innerHTML=`
+            <line x1="8" y1="50" x2="352" y2="50" stroke="${color}" stroke-width="2" stroke-dasharray="6,4" opacity="0.5"/>
+            <text x="50%" y="75" text-anchor="middle" fill="#555" font-family="Space Mono,monospace"
+              font-size="9" letter-spacing="1">PRICE HISTORY BUILDING...</text>`;
+        }
+      })
+      .catch(() => {
+        // Network error — draw comparison chart from all sources as fallback
+        const prices = sorted.map(r=>r.price);
+        if (prices.length >= 2) {
+          const w=360,h=100,pad=8;
+          const min=Math.min(...prices)*0.95, max=Math.max(...prices)*1.05;
+          const coords=prices.map((v,i)=>{
+            const x=pad+(i/(prices.length-1))*(w-pad*2);
+            const y=h-pad-((v-min)/(max-min||1))*(h-pad*2);
+            return [x,y];
+          });
+          const line='M '+coords.map(c=>c.join(',')).join(' L ');
+          const area=line+` L ${coords[coords.length-1][0]},${h} L ${coords[0][0]},${h} Z`;
+          chartEl.innerHTML=`
+            <defs><linearGradient id="pg${index}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--up)" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="var(--up)" stop-opacity="0"/>
+            </linearGradient></defs>
+            <path d="${area}" fill="url(#pg${index})"/>
+            <path d="${line}" fill="none" stroke="var(--up)" stroke-width="2" stroke-linecap="round"/>`;
+        }
+      });
   }
 }
 

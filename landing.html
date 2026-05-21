@@ -4,6 +4,16 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>DRIPTRACK — Never Overpay Again</title>
+<script>
+// Runs before ANY page content renders — logged-in users skip the landing page instantly
+(function(){
+  try {
+    const token = localStorage.getItem('driptrack_token');
+    const user  = localStorage.getItem('driptrack_user');
+    if (token && user) { window.location.replace('/app'); }
+  } catch(e) {}
+})();
+</script>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230a0a0a'/><rect x='2' y='2' width='28' height='28' fill='none' stroke='%23e8ff00' stroke-width='1.5'/><text x='16' y='22' font-family='Arial Black,sans-serif' font-weight='900' font-size='14' fill='%23e8ff00' text-anchor='middle'>DT</text></svg>">
 <meta name="theme-color" content="#0a0a0a">
@@ -652,15 +662,7 @@ const revealObs=new IntersectionObserver(entries=>{
 },{threshold:0.1,rootMargin:'0px 0px -40px 0px'});
 document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
 
-// ── AUTH STATE — if already logged in, go straight to the app
-(function(){
-  const token=localStorage.getItem('driptrack_token');
-  const userStr=localStorage.getItem('driptrack_user');
-  if(token&&userStr){
-    // Already authenticated → skip landing page, open the app immediately
-    window.location.replace('/app');
-  }
-})();
+// Auth check is now at the top of <head> — no duplicate needed here
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════
