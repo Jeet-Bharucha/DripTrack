@@ -2,7 +2,7 @@
 // DRIPTRACK — API Connector v6
 // ─────────────────────────────────────────────
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? `http://${window.location.hostname}:3000/api`
+  ? `http://${window.location.hostname}:3001/api`
   : `${window.location.origin}/api`;
 const AUTH_BASE = API_BASE.replace('/api', '/auth');
 window._lastResults = [];
@@ -673,6 +673,8 @@ async function searchLivePrices(query) {
 function renderLiveResults(results, isAutoLoad = false, append = false) {
   const grid = document.getElementById('product-grid');
   if (!append) window._shownCount = 8;
+  // Store current displayed results so openLivePanel can look up by real index
+  window._currentResults = results;
 
   // Update result count + timestamp
   const countEl = document.getElementById('result-count');
@@ -709,7 +711,7 @@ function renderLiveResults(results, isAutoLoad = false, append = false) {
     const scoreColor = dealScoreColor(score);
 
     return `
-      <div class="product-card" style="animation-delay:${i * 0.06}s${isBestDeal ? ';border-color:var(--up)' : ''}" onclick="openLivePanel(${i})" onmouseenter="_prefetchAngles(${i})">
+      <div class="product-card" style="animation-delay:${i * 0.06}s${isBestDeal ? ';border-color:var(--up)' : ''}" onclick="openLivePanel(${results.indexOf(item)})" onmouseenter="_prefetchAngles(${results.indexOf(item)})">
         <div class="card-img-wrap" style="position:relative;overflow:hidden">
           ${item.image
             ? `<img src="${item.image}" alt="product"
@@ -1031,7 +1033,7 @@ function renderRecentlyViewed() {
 
 // ─── Pre-fetch angles on hover so panel opens with images already cached ───
 function _prefetchAngles(index) {
-  const item = (window._lastResults || [])[index];
+  const item = (window._currentResults || window._lastResults || [])[index];
   if (!item) return;
   const query = item.title || window._lastQuery;
   if (!window._angleCache[query]) {
@@ -1041,7 +1043,7 @@ function _prefetchAngles(index) {
 }
 
 function openLivePanel(index) {
-  const item = (window._lastResults || [])[index];
+  const item = (window._currentResults || window._lastResults || [])[index];
   if (!item) return;
 
   // Track this product as recently viewed
@@ -1093,12 +1095,20 @@ function _renderPanelSources(results, featuredItem) {
   const sorted = [...results].sort((a, b) => a.price - b.price);
   const best = sorted[0] || featuredItem;
 
-  // Update best price display
-  const bestFmt = best.price >= 1000
-    ? '$' + (best.price / 1000).toFixed(1) + 'K'
-    : '$' + best.price.toFixed(2);
-  document.getElementById('panelPrice').textContent = bestFmt;
-  document.getElementById('panelPriceSub').textContent = `✓ Best price on ${best.source}`;
+  // ── Price display: always show the CLICKED item's price, NOT the cheapest ──
+  // (panelPrice was already set correctly by openLivePanel before this runs)
+  // Just update the sub-label to hint at a better deal if one exists
+  const clickedPrice = featuredItem.price;
+  if (best && best !== featuredItem && best.price < clickedPrice) {
+    const bestFmt = best.price >= 1000
+      ? '$' + (best.price / 1000).toFixed(1) + 'K'
+      : '$' + best.price.toFixed(2);
+    document.getElementById('panelPriceSub').textContent =
+      `✓ Price on ${featuredItem.source} · Best: ${bestFmt} on ${best.source}`;
+  } else {
+    document.getElementById('panelPriceSub').textContent =
+      `✓ Live price from ${featuredItem.source}`;
+  }
   document.getElementById('panelPriceSub').style.color = 'var(--up)';
 
   if (sorted.length === 0) {
