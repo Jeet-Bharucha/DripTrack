@@ -1077,10 +1077,9 @@ function openLivePanel(index) {
     resetPanelButtons({ title: item.title || 'Product', source: item.source || 'Unknown', price: item.price, url: item.url || '', image: item.image || '' });
   }
 
-  // ── 3. Render prices instantly from already-fetched _lastResults ──
-  // We already have all prices from the search — no need to re-fetch!
-  const allResults = (window._lastResults || []).filter(r => r && r.price);
-  _renderPanelSources(allResults, item);
+  // ── 3. Show clicked item immediately as the only confirmed source ──
+  // DO NOT dump all search results here — they are different products!
+  _renderPanelSources([item], item);
 
   // ── 4. Kick off angles + history in parallel (non-blocking) ────
   const query = item.title || window._lastQuery;
@@ -1088,6 +1087,33 @@ function openLivePanel(index) {
     loadAnglesForPanel(query, '🛍️', item.image || null);
   }
   loadPanelPriceHistory(query);
+
+  // ── 5. Fetch real cross-retailer prices for THIS specific product ──
+  // Show loading state, then update sources when results arrive
+  const sourcesEl = document.getElementById('panelSources');
+  if (sourcesEl) {
+    sourcesEl.insertAdjacentHTML('beforeend', `
+      <div id="panelSourcesLoading" style="padding:10px 0;font-family:'Space Mono',monospace;
+           font-size:9px;color:var(--grey-400);letter-spacing:0.05em">
+        ↻ SEARCHING OTHER STORES...
+      </div>`);
+  }
+  const _API_BASE = (typeof API_BASE !== 'undefined' ? API_BASE : '') ||
+    (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
+  fetch(`${_API_BASE}/api/prices?q=${encodeURIComponent(query)}`)
+    .then(r => r.json())
+    .then(data => {
+      // Only update if the user is still looking at this same panel
+      if (document.getElementById('panelTitle')?.textContent !== cleanTitle) return;
+      document.getElementById('panelSourcesLoading')?.remove();
+      const fresh = (data.results || []).filter(r => r && r.price && !r.browse);
+      if (fresh.length > 0) {
+        _renderPanelSources(fresh, item);
+      }
+    })
+    .catch(() => {
+      document.getElementById('panelSourcesLoading')?.remove();
+    });
 }
 
 // Renders the price sources list and comparison chart — synchronous, instant
@@ -1095,16 +1121,16 @@ function _renderPanelSources(results, featuredItem) {
   const sorted = [...results].sort((a, b) => a.price - b.price);
   const best = sorted[0] || featuredItem;
 
-  // ── Price display: always show the CLICKED item's price, NOT the cheapest ──
-  // (panelPrice was already set correctly by openLivePanel before this runs)
-  // Just update the sub-label to hint at a better deal if one exists
+  // ── Price display: always preserve the CLICKED item's price ──
+  // panelPrice was set by openLivePanel and must not be overwritten.
+  // Update sub-label: hint at cheapest alternative if one exists below clicked price.
   const clickedPrice = featuredItem.price;
-  if (best && best !== featuredItem && best.price < clickedPrice) {
+  if (best && best.price < clickedPrice && best !== featuredItem) {
     const bestFmt = best.price >= 1000
       ? '$' + (best.price / 1000).toFixed(1) + 'K'
       : '$' + best.price.toFixed(2);
     document.getElementById('panelPriceSub').textContent =
-      `✓ Price on ${featuredItem.source} · Best: ${bestFmt} on ${best.source}`;
+      `✓ Price on ${featuredItem.source} · Best available: ${bestFmt} on ${best.source}`;
   } else {
     document.getElementById('panelPriceSub').textContent =
       `✓ Live price from ${featuredItem.source}`;
