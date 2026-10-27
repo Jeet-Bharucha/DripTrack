@@ -1,112 +1,41 @@
-# DRIPTRACK — Real-Time Price Intelligence
-
-Real-time price tracking for sneakers, watches, bags, and streetwear across Nike, GOAT, StockX, Amazon, and more. Only authentic products.
+# DripTrack
 
 Website: https://driptrack-fgvs.onrender.com
 
----
+Product listing discovery for sneakers, watches, bags and accessories. The UI shows original source titles, source images, USD prices, condition when supplied, and server fetch timestamps. DripTrack does not sell or independently authenticate products.
 
-## Features
+## Run locally
 
-- **Live price ticker** — scrolling price feed updated every 15 minutes
-- **Product search & tracking** — search across multiple resale platforms
-- **Watchlist** — save products and monitor price changes
-- **Price alerts** — get notified by email when a product hits your target price
-- **Price comparison** — compare prices across platforms side by side
-- **Dark / light mode**
-- **User accounts** — register, login, email verification, password reset
+Use Node.js 20 or newer. Install backend dependencies with `npm install --prefix backend`, copy `.env.example` to `backend/.env`, supply your own settings, then run `npm start`. Open http://localhost:3001.
 
----
+`npm run build` regenerates the HTML pages from `build-pages.js`. Shared layout and behavior live in `site.css` and `site.js`.
 
-## Tech Stack
+## Data providers
 
-**Frontend**
-- Vanilla HTML, CSS, JavaScript
-- Google Fonts (Bebas Neue, Space Mono, Barlow Condensed)
+- eBay Browse API: individual fixed-price listings, condition, images, shipping when supplied, and product details.
+- Rainforest: Amazon search listings. HTTP 402 means the provider needs billing/credit attention; the application does not invent replacements.
+- SerpAPI Google Shopping: indexed listings. Google product links are explicitly labeled as shopping results, not direct seller pages.
 
-**Backend**
-- Node.js + Express
-- MongoDB + Mongoose
-- JWT authentication
-- Nodemailer (Gmail) for transactional emails
-- Axios for external API calls
+Only priced USD results with a source-provided HTTPS URL and matching title are displayed. Results are cached in memory for up to one hour. Concurrent identical searches share a single provider request. Billing, authentication and rate-limit failures have cooldowns. Provider status reflects actual requests; configuration alone is not reported as a working connection.
 
-**APIs**
-- Rainforest API
-- eBay API
-- SerpAPI
+No hardcoded product prices, testimonials, usage statistics, simulated history, authenticity guarantees or image substitutions are used. Descriptions and item facts come from providers; missing information is disclosed. A listed price is not a checkout quote and may vary with size, condition, shipping and taxes.
 
----
+History observations use stable listing IDs and are recorded only after fresh search fetches. Old mixed-query history is excluded. Alerts match the exact listing ID, and old alerts without an ID are paused. The alert checker runs approximately every 30 minutes while the server is active; free hosting may sleep. Email delivery depends on the configured mail service.
 
-## Getting Started
+## Accounts
 
-### Prerequisites
-- Node.js (v18+)
-- MongoDB Atlas account (or local MongoDB)
-- Gmail account with App Password enabled
+Email/password and configured Google OAuth sign-in are supported. Saved listings and alerts are held in MongoDB. The site checks source data again when saving a listing or alert. Passwords are hashed, OAuth uses a state cookie, and the OAuth return token is passed in a URL fragment rather than the query string. Account deletion removes the profile and push subscriptions.
 
-### Installation
+## Configuration
 
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/Jeet-Bharucha/DripTrack.git
-   cd DripTrack
-   ```
+See `.env.example`. Required for accounts: `MONGODB_URI` and a persistent random `JWT_SECRET`. Email uses `GMAIL_USER` and `GMAIL_PASS` (an app password). Google login requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and the matching redirect URI. Provider keys are optional; unavailable sources are disclosed.
 
-2. **Install backend dependencies**
-   ```bash
-   cd backend
-   npm install
-   ```
+Set `PUBLIC_URL` to the deployed HTTPS origin when needed. The application automatically uses `RENDER_EXTERNAL_URL` on Render or `RAILWAY_PUBLIC_DOMAIN` on Railway. Never commit credentials.
 
-3. **Create your `.env` file** inside the `backend/` folder
-   ```
-   RAINFOREST_API_KEY=your_key_here
-   EBAY_CLIENT_ID=your_key_here
-   EBAY_CLIENT_SECRET=your_secret_here
-   SERPAPI_KEY=your_key_here
-   MONGODB_URI=your_mongodb_connection_string
-   JWT_SECRET=your_random_secret_string
-   GMAIL_USER=your_gmail@gmail.com
-   GMAIL_PASS=your_gmail_app_password
-   ```
+## Checks
 
-4. **Start the server**
-   ```bash
-   npm start
-   ```
+Run `npm test`. Tests cover source filtering, unsafe URLs, source provenance, provider failures, request deduplication and cache timestamps. Route tests use an isolated in-memory model and real password hashing/JWT middleware to check registration, login, watchlist deduplication, exact-listing alerts, profile updates and account deletion. They do not write to production or send email.
 
-5. **Open in browser**
-   ```
-   http://localhost:3001
-   ```
+## Hosting
 
----
-
-## Pages
-
-| Page | URL |
-|------|-----|
-| Home | `/` |
-| Products | `/index.html#products` |
-| Login | `/login.html` |
-| Register | `/register.html` |
-| Account | `/account.html` |
-| Reset Password | `/resetpassword.html` |
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `RAINFOREST_API_KEY` | Rainforest API key for Amazon product data |
-| `EBAY_CLIENT_ID` | eBay Developer App Client ID |
-| `EBAY_CLIENT_SECRET` | eBay Developer App Client Secret |
-| `SERPAPI_KEY` | SerpAPI key for search results |
-| `MONGODB_URI` | MongoDB Atlas connection string |
-| `JWT_SECRET` | Secret key for signing JWT tokens |
-| `GMAIL_USER` | Gmail address used to send emails |
-| `GMAIL_PASS` | Gmail App Password (not your real password) |
-
-> Never commit your `.env` file. It is already listed in `.gitignore`.
+Render service uses branch `master`, build command `cd backend && npm install`, and start command `node backend/server.js`. The server listens on `0.0.0.0` and `PORT`. `/api/status` reports database and provider status. Public assets are explicitly allowlisted. Unknown pages return the custom 404 page.

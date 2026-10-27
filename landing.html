@@ -1,1009 +1,162 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>DRIPTRACK — Never Overpay Again</title>
-<script>
-// Runs before ANY page content renders — logged-in users skip the landing page instantly
-(function(){
-  try {
-    const token = localStorage.getItem('driptrack_token');
-    const user  = localStorage.getItem('driptrack_user');
-    if (token && user) { window.location.replace('/app'); }
-  } catch(e) {}
-})();
-</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#243d32">
+<title>Price discovery, with the receipts. — DripTrack</title>
+<meta name="description" content="Discover sourced product listings with clear prices, original titles and transparent data. DripTrack helps you shop better informed.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23243d32'/%3E%3Ctext x='10' y='44' font-size='36' font-family='Arial' font-weight='bold' fill='%23d9f474'%3Edt%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/site.css">
 <link rel="manifest" href="/manifest.json">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230a0a0a'/><rect x='2' y='2' width='28' height='28' fill='none' stroke='%23e8ff00' stroke-width='1.5'/><text x='16' y='22' font-family='Arial Black,sans-serif' font-weight='900' font-size='14' fill='%23e8ff00' text-anchor='middle'>DT</text></svg>">
-<meta name="theme-color" content="#0a0a0a">
-<meta property="og:title" content="DRIPTRACK — Real-Time Price Intelligence">
-<meta property="og:description" content="Track sneakers, watches, bags & streetwear prices across Nike, StockX, GOAT, Amazon & more. Never overpay again.">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
-<style>
-:root{
-  --black:#0a0a0a;--grey-900:#111;--grey-800:#1a1a1a;--grey-700:#252525;
-  --grey-600:#333;--grey-400:#666;--grey-200:#aaa;--white:#f0f0f0;
-  --accent:#e8ff00;--accent2:#ff3c3c;--up:#39ff14;--down:#ff3c3c;
-}
-*{margin:0;padding:0;box-sizing:border-box;cursor:none !important;}
-html,body,*,*::before,*::after{cursor:none !important;}
-html{scroll-behavior:smooth;}
-body{background:var(--black);color:var(--white);font-family:'Barlow Condensed',sans-serif;overflow-x:hidden;}
-
-/* NOISE OVERLAY */
-body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:1000;opacity:0.4;}
-
-/* CURSOR */
-.cursor{position:fixed;width:12px;height:12px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;opacity:0;transition:transform 0.1s ease;mix-blend-mode:difference;}
-.cursor-ring{position:fixed;width:36px;height:36px;border:1px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;opacity:0;transition:all 0.15s ease;}
-
-/* ── NAV ────────────────────────────────── */
-nav{position:fixed;top:0;left:0;right:0;z-index:500;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:20px 48px;
-  background:rgba(10,10,10,0);
-  backdrop-filter:blur(0px);
-  border-bottom:1px solid transparent;
-  transition:all 0.4s ease;}
-nav.scrolled{background:rgba(10,10,10,0.92);backdrop-filter:blur(16px);border-bottom-color:var(--grey-700);}
-.nav-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:5px;color:var(--accent);text-decoration:none;}
-.nav-logo span{color:var(--white);}
-.nav-links{display:flex;gap:36px;list-style:none;}
-.nav-links a{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--grey-200);text-decoration:none;transition:color 0.2s;}
-.nav-links a:hover{color:var(--accent);}
-.nav-actions{display:flex;gap:12px;align-items:center;}
-.btn-nav-ghost{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--white);background:transparent;border:1px solid var(--grey-600);padding:10px 20px;cursor:none;transition:all 0.2s;text-decoration:none;}
-.btn-nav-ghost:hover{border-color:var(--accent);color:var(--accent);}
-.btn-nav-cta{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--black);background:var(--accent);border:none;padding:10px 20px;cursor:none;font-weight:700;transition:all 0.2s;text-decoration:none;}
-.btn-nav-cta:hover{background:var(--white);}
-.hamburger{display:none;flex-direction:column;gap:5px;background:none;border:none;padding:4px;}
-.hamburger span{display:block;width:24px;height:2px;background:var(--accent);transition:all 0.3s;}
-.mobile-menu{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,10,0.98);z-index:499;padding:100px 32px 40px;flex-direction:column;gap:24px;}
-.mobile-menu.open{display:flex;}
-.mobile-menu a{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;color:var(--grey-200);text-decoration:none;border-bottom:1px solid var(--grey-800);padding-bottom:20px;}
-.mobile-menu a:hover{color:var(--accent);}
-
-/* ── HERO ───────────────────────────────── */
-.hero{
-  min-height:100dvh;display:flex;flex-direction:column;justify-content:center;
-  padding:120px 48px 80px;position:relative;overflow:hidden;
-}
-.hero-bg{position:absolute;inset:0;
-  background:
-    radial-gradient(ellipse 70% 60% at 80% 30%,rgba(232,255,0,0.07) 0%,transparent 60%),
-    radial-gradient(ellipse 50% 70% at 10% 80%,rgba(57,255,20,0.04) 0%,transparent 60%),
-    radial-gradient(ellipse 40% 40% at 50% 50%,rgba(0,0,0,0) 0%,#0a0a0a 100%);
-}
-.hero-grid{position:absolute;inset:0;
-  background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),
-                   linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);
-  background-size:64px 64px;}
-
-.hero-content{position:relative;z-index:2;max-width:900px;}
-.hero-eyebrow{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:5px;color:var(--accent);text-transform:uppercase;margin-bottom:28px;display:flex;align-items:center;gap:10px;}
-.live-dot{width:7px;height:7px;background:var(--up);border-radius:50%;animation:blink 1.2s ease-in-out infinite;flex-shrink:0;}
-@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
-
-.hero-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(72px,13vw,172px);line-height:0.88;letter-spacing:2px;margin-bottom:32px;}
-.hero-title .line-accent{color:var(--accent);}
-.hero-title .line-outline{color:transparent;-webkit-text-stroke:1px rgba(240,240,240,0.2);}
-
-.hero-sub{font-family:'Barlow Condensed',sans-serif;font-size:clamp(17px,2.5vw,22px);color:var(--grey-200);letter-spacing:1px;line-height:1.5;max-width:540px;margin-bottom:48px;}
-
-.hero-cta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:72px;}
-.btn-primary{font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--black);background:var(--accent);border:none;padding:18px 36px;cursor:none;font-weight:700;transition:all 0.2s;text-decoration:none;display:inline-flex;align-items:center;gap:10px;position:relative;overflow:hidden;}
-.btn-primary::after{content:'';position:absolute;inset:0;background:white;transform:translateX(-101%);transition:transform 0.2s ease;}
-.btn-primary:hover::after{transform:translateX(0);}
-.btn-primary span{position:relative;z-index:1;}
-.btn-secondary{font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--white);background:transparent;border:1px solid var(--grey-600);padding:18px 36px;cursor:none;transition:all 0.2s;text-decoration:none;}
-.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
-
-.hero-stats{display:flex;gap:56px;padding-top:40px;border-top:1px solid var(--grey-700);}
-.stat-num{font-family:'Bebas Neue',sans-serif;font-size:44px;color:var(--accent);letter-spacing:2px;line-height:1;}
-.stat-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400);margin-top:4px;text-transform:uppercase;}
-
-/* Floating product cards */
-.hero-float{position:absolute;right:48px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:12px;z-index:2;}
-.float-card{background:var(--grey-900);border:1px solid var(--grey-700);padding:16px 20px;min-width:260px;animation:floatUp 0.6s ease both;}
-.float-card:nth-child(1){animation-delay:0.1s;transform:rotate(-1.5deg);}
-.float-card:nth-child(2){animation-delay:0.25s;transform:rotate(0.8deg);}
-.float-card:nth-child(3){animation-delay:0.4s;transform:rotate(-0.5deg);}
-@keyframes floatUp{from{opacity:0;transform:translateY(30px) rotate(var(--r,0deg));}to{opacity:1;transform:translateY(0) rotate(var(--r,0deg));}}
-.float-card:hover{border-color:var(--accent);transform:rotate(0deg) scale(1.02);transition:all 0.2s;}
-.fc-label{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:6px;}
-.fc-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:10px;line-height:1.1;}
-.fc-row{display:flex;justify-content:space-between;align-items:baseline;}
-.fc-price{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--white);letter-spacing:1px;}
-.fc-change{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;}
-.fc-change.up{color:var(--up);}
-.fc-change.down{color:var(--down);}
-.fc-sources{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;}
-.fc-source{font-family:'Space Mono',monospace;font-size:7px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;background:var(--grey-800);border:1px solid var(--grey-600);color:var(--grey-400);}
-
-/* ── TICKER ─────────────────────────────── */
-.ticker-bar{background:var(--grey-900);border-top:1px solid var(--grey-700);border-bottom:1px solid var(--grey-700);overflow:hidden;height:36px;display:flex;align-items:center;}
-.ticker-track{display:flex;animation:ticker 40s linear infinite;white-space:nowrap;}
-.ticker-item{display:inline-flex;align-items:center;gap:10px;padding:0 36px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;border-right:1px solid var(--grey-700);}
-.ticker-item .n{color:var(--grey-200);}
-.ticker-item .p{color:var(--white);font-weight:700;}
-.ticker-item .up{color:var(--up);}
-.ticker-item .dn{color:var(--down);}
-@keyframes ticker{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
-
-/* ── BRANDS STRIP ────────────────────────── */
-.brands-strip{padding:32px 48px;background:var(--grey-900);border-bottom:1px solid var(--grey-700);}
-.brands-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--grey-400);text-transform:uppercase;text-align:center;margin-bottom:20px;}
-.brands-row{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:0;}
-.brand-pill{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:3px;padding:10px 20px;border-right:1px solid var(--grey-700);color:var(--grey-400);opacity:0.5;transition:opacity 0.2s;white-space:nowrap;}
-.brand-pill:last-child{border-right:none;}
-.brand-pill:hover{opacity:1;color:var(--accent);}
-
-/* ── FEATURES ────────────────────────────── */
-.features{padding:100px 48px;background:var(--black);}
-.section-label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--accent);text-transform:uppercase;margin-bottom:16px;}
-.section-label::before{content:'// ';}
-.section-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,6vw,72px);letter-spacing:2px;line-height:1;margin-bottom:64px;}
-.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
-.feature-card{background:var(--grey-900);border:1px solid var(--grey-700);padding:40px 32px;transition:all 0.3s;position:relative;overflow:hidden;}
-.feature-card::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 80% at 0% 0%,rgba(232,255,0,0.04) 0%,transparent 70%);opacity:0;transition:opacity 0.3s;}
-.feature-card:hover{border-color:var(--accent);}
-.feature-card:hover::before{opacity:1;}
-.feature-icon{font-size:40px;margin-bottom:24px;display:block;}
-.feature-num{font-family:'Bebas Neue',sans-serif;font-size:80px;color:rgba(232,255,0,0.05);line-height:1;position:absolute;top:16px;right:20px;}
-.feature-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;margin-bottom:14px;color:var(--white);}
-.feature-desc{font-family:'Barlow Condensed',sans-serif;font-size:16px;color:var(--grey-200);line-height:1.6;letter-spacing:0.5px;}
-
-/* ── HOW IT WORKS ────────────────────────── */
-.how{padding:100px 48px;background:var(--grey-900);border-top:1px solid var(--grey-700);border-bottom:1px solid var(--grey-700);}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:64px;position:relative;}
-.steps::before{content:'';position:absolute;top:40px;left:16.66%;right:16.66%;height:1px;background:var(--grey-700);}
-.step{padding:0 32px;text-align:center;position:relative;}
-.step-num{font-family:'Bebas Neue',sans-serif;font-size:64px;color:var(--accent);line-height:1;margin-bottom:20px;position:relative;display:inline-block;}
-.step-num::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:40px;height:2px;background:var(--accent);}
-.step-icon{font-size:36px;margin:20px 0 20px;}
-.step-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;margin-bottom:12px;}
-.step-desc{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.5px;color:var(--grey-400);line-height:1.8;}
-
-/* ── PRODUCT SHOWCASE ────────────────────── */
-.showcase{padding:100px 48px;background:var(--black);overflow:hidden;}
-.showcase-scroll{display:flex;gap:2px;margin-top:48px;animation:scrollLeft 30s linear infinite;}
-.showcase-scroll:hover{animation-play-state:paused;}
-@keyframes scrollLeft{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
-.showcase-card{min-width:280px;background:var(--grey-900);border:1px solid var(--grey-700);padding:0;flex-shrink:0;transition:all 0.3s;overflow:hidden;}
-.showcase-card:hover{border-color:var(--accent);transform:translateY(-6px);}
-.sc-img{height:180px;background:var(--grey-800);display:flex;align-items:center;justify-content:center;font-size:72px;border-bottom:1px solid var(--grey-700);}
-.sc-body{padding:20px;}
-.sc-cat{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:6px;}
-.sc-name{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;margin-bottom:12px;line-height:1.1;}
-.sc-price-row{display:flex;justify-content:space-between;align-items:baseline;}
-.sc-price{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--white);letter-spacing:1px;}
-.sc-change{font-family:'Space Mono',monospace;font-size:10px;font-weight:700;}
-.sc-change.up{color:var(--up);}
-.sc-change.down{color:var(--down);}
-
-/* ── SOCIAL PROOF ────────────────────────── */
-.social-proof{padding:100px 48px;background:var(--grey-900);border-top:1px solid var(--grey-700);}
-.stats-big{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:80px;}
-.stat-big-card{background:var(--grey-800);border:1px solid var(--grey-700);padding:40px 32px;text-align:center;}
-.stat-big-num{font-family:'Bebas Neue',sans-serif;font-size:56px;color:var(--accent);letter-spacing:2px;line-height:1;}
-.stat-big-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400);margin-top:8px;text-transform:uppercase;}
-.testimonials{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
-.testimonial{background:var(--grey-800);border:1px solid var(--grey-700);padding:32px;transition:border-color 0.2s;}
-.testimonial:hover{border-color:var(--accent);}
-.testimonial-text{font-family:'Barlow Condensed',sans-serif;font-size:18px;color:var(--white);line-height:1.5;letter-spacing:0.5px;margin-bottom:24px;}
-.testimonial-text::before{content:'"';font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--accent);line-height:0.8;display:block;margin-bottom:12px;}
-.testimonial-author{display:flex;align-items:center;gap:12px;}
-.testimonial-avatar{width:36px;height:36px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--black);}
-.testimonial-name{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--white);text-transform:uppercase;}
-.testimonial-handle{font-family:'Space Mono',monospace;font-size:9px;color:var(--grey-400);}
-
-/* ── CTA SECTION ─────────────────────────── */
-.cta-section{
-  padding:120px 48px;background:var(--black);
-  text-align:center;position:relative;overflow:hidden;
-  border-top:1px solid var(--grey-700);
-}
-.cta-section::before{
-  content:'';position:absolute;inset:0;
-  background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(232,255,0,0.06) 0%,transparent 70%);
-}
-.cta-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(56px,10vw,120px);letter-spacing:2px;line-height:0.9;position:relative;z-index:1;margin-bottom:24px;}
-.cta-title .accent{color:var(--accent);}
-.cta-sub{font-family:'Space Mono',monospace;font-size:12px;letter-spacing:2px;color:var(--grey-200);margin-bottom:48px;position:relative;z-index:1;}
-.cta-buttons{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1;}
-.cta-note{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-400);margin-top:20px;position:relative;z-index:1;}
-
-/* ── FOOTER ──────────────────────────────── */
-footer{background:var(--grey-900);border-top:1px solid var(--grey-700);}
-.footer-top{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:48px;padding:64px 48px 48px;}
-.footer-brand .footer-logo{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:5px;color:var(--accent);display:block;margin-bottom:8px;}
-.footer-tagline{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400);text-transform:uppercase;margin-bottom:20px;}
-.footer-desc{font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--grey-400);line-height:1.6;max-width:280px;}
-.footer-col-title{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:20px;}
-.footer-links{list-style:none;display:flex;flex-direction:column;gap:12px;}
-.footer-links a{font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--grey-400);text-decoration:none;letter-spacing:1px;transition:color 0.2s;}
-.footer-links a:hover{color:var(--white);}
-.footer-bottom{display:flex;justify-content:space-between;align-items:center;padding:20px 48px;border-top:1px solid var(--grey-700);flex-wrap:wrap;gap:12px;}
-.footer-copy{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-400);}
-.footer-status{display:flex;align-items:center;gap:6px;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-400);}
-
-/* ── SCROLL REVEAL ───────────────────────── */
-.reveal{opacity:0;transform:translateY(28px);transition:opacity 0.7s ease,transform 0.7s ease;}
-.reveal.visible{opacity:1;transform:translateY(0);}
-.reveal-delay-1{transition-delay:0.1s;}
-.reveal-delay-2{transition-delay:0.2s;}
-.reveal-delay-3{transition-delay:0.3s;}
-
-/* ── MOBILE ──────────────────────────────── */
-@media(max-width:768px){
-  nav{padding:14px 20px;}
-  .nav-links{display:none;}
-  .nav-actions{display:none;}
-  .hamburger{display:flex;}
-
-  .hero{padding:100px 20px 60px;min-height:auto;}
-  .hero-float{display:none;}
-  .hero-title{font-size:clamp(56px,18vw,110px);}
-  .hero-stats{flex-wrap:wrap;gap:20px;}
-  .hero-cta{flex-direction:column;}
-  .btn-primary,.btn-secondary{width:100%;text-align:center;justify-content:center;}
-
-  .brands-strip{padding:24px 20px;}
-  .brands-row{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px;}
-
-  .features{padding:64px 20px;}
-  .features-grid{grid-template-columns:1fr;}
-
-  .how{padding:64px 20px;}
-  .steps{grid-template-columns:1fr;gap:40px;}
-  .steps::before{display:none;}
-  .step{text-align:left;padding:0;}
-
-  .showcase{padding:64px 0 64px 20px;}
-  .showcase-scroll{animation:none;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .showcase-scroll::-webkit-scrollbar{height:2px;}
-
-  .social-proof{padding:64px 20px;}
-  .stats-big{grid-template-columns:1fr 1fr;}
-  .testimonials{grid-template-columns:1fr;}
-
-  .cta-section{padding:80px 20px;}
-  .cta-buttons{flex-direction:column;align-items:stretch;}
-
-  .footer-top{grid-template-columns:1fr 1fr;gap:32px;padding:48px 20px 32px;}
-  .footer-brand{grid-column:1/-1;}
-  .footer-bottom{padding:16px 20px;}
-}
-
-@media(max-width:480px){
-  nav{padding:12px 16px;}
-  .hero{padding:88px 16px 48px;}
-  .hero-title{font-size:clamp(48px,20vw,80px);}
-  .features{padding:48px 16px;}
-  .how{padding:48px 16px;}
-  .social-proof{padding:48px 16px;}
-  .stats-big{grid-template-columns:1fr;}
-  .footer-top{grid-template-columns:1fr;padding:40px 16px 24px;}
-}
-</style>
+<script defer src="/site.js">
+</script>
 </head>
-<body>
-
-<!-- CURSOR -->
-<div class="cursor" id="cursor"></div>
-<div class="cursor-ring" id="cursorRing"></div>
-
-<!-- NAV -->
-<nav id="mainNav">
-  <a href="/landing.html" class="nav-logo">DRIP<span>TRACK</span></a>
-  <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">
-    <span></span><span></span><span></span>
-  </button>
-  <ul class="nav-links">
-    <li><a href="#features">Features</a></li>
-    <li><a href="#how">How It Works</a></li>
-    <li><a href="#products">Products</a></li>
-    <li><a href="#proof">Reviews</a></li>
-  </ul>
-  <div class="nav-actions">
-    <a href="/login.html" class="btn-nav-ghost">Sign In</a>
-    <a href="/register.html" class="btn-nav-cta">Get Started Free</a>
-  </div>
+<body data-page="home">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<nav class="nav wrap" aria-label="Main navigation">
+<a class="brand" href="/" aria-label="DripTrack home">
+<span class="brandmark" aria-hidden="true">dt</span>driptrack</a>
+<div class="nav-links">
+<a href="/app" >Explore</a>
+<a class="watch-nav" aria-label="Watchlist" href="/watchlist.html" >Watchlist</a>
+<a class="nav-about" href="/about.html" >Our data</a>
+<a class="nav-button" id="account-link" href="/login.html">Sign in ↗</a>
+</div>
 </nav>
-
-<!-- MOBILE MENU -->
-<div class="mobile-menu" id="mobileMenu">
-  <a href="#features" onclick="toggleMenu()">Features</a>
-  <a href="#how" onclick="toggleMenu()">How It Works</a>
-  <a href="#products" onclick="toggleMenu()">Products</a>
-  <a href="/login.html">Sign In</a>
-  <a href="/register.html" style="color:var(--accent)">Get Started Free →</a>
+</header>
+<main class="wrap" id="main">
+  <section class="hero">
+<div>
+<div class="eyebrow">
+<span class="dot">
+</span> A clearer way to shop</div>
+<h1>Good taste.<br>
+<em>Better informed.</em>
+</h1>
+<p>Find sneakers, watches and everyday grails. See what sellers are asking, where the data comes from, and when we fetched it.</p>
+<form class="search-form" data-search role="search">
+<label class="sr-only" for="query" hidden>Search products</label>
+<input id="query" name="q" type="search" aria-label="Search products" placeholder="Try Nike Dunk Low Panda…" minlength="2" maxlength="120" required autocomplete="off">
+<button class="button" type="submit">Search ↗</button>
+</form>
+<div class="chips" aria-label="Suggested searches">
+<a class="chip" href="/app?q=Nike%20Dunk%20Low%20Panda">Nike Dunk Low Panda</a>
+<a class="chip" href="/app?q=Adidas%20Samba%20OG">Adidas Samba OG</a>
+<a class="chip" href="/app?q=New%20Balance%20550">New Balance 550</a>
+<a class="chip" href="/app?q=Seiko%20Prospex">Seiko Prospex</a>
 </div>
-
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-bg"></div>
-  <div class="hero-grid"></div>
-  <div class="hero-content">
-    <p class="hero-eyebrow"><span class="live-dot"></span> Live prices — updated every 15 minutes</p>
-    <h1 class="hero-title">
-      NEVER<br>
-      <span class="line-outline">OVER</span><br>
-      <span class="line-accent">PAY.</span>
-    </h1>
-    <p class="hero-sub">Real-time price tracking across Nike, StockX, GOAT, Amazon & 8 more sources. Sneakers, watches, bags, streetwear. Set alerts, compare deals, buy smart.</p>
-    <div class="hero-cta">
-      <a href="/register.html" class="btn-primary"><span>Start Tracking Free →</span></a>
-      <a href="/app" class="btn-secondary">Browse Prices</a>
-    </div>
-    <div class="hero-stats">
-      <div><div class="stat-num" data-target="50">0</div><div class="stat-label">Products Tracked (K+)</div></div>
-      <div><div class="stat-num" data-target="12">0</div><div class="stat-label">Verified Sources</div></div>
-      <div><div class="stat-num" data-target="100">0</div><div class="stat-label">% Authentic Only</div></div>
-      <div><div class="stat-num" data-target="15">0</div><div class="stat-label">Price Updates Daily (M)</div></div>
-    </div>
-  </div>
-
-  <!-- Floating product cards -->
-  <div class="hero-float">
-    <div class="float-card">
-      <div class="fc-label">Best Price Found</div>
-      <div class="fc-name">Air Jordan 1 Retro High OG Chicago</div>
-      <div class="fc-row">
-        <div class="fc-price">$289</div>
-        <div class="fc-change up">▲ 12.4%</div>
-      </div>
-      <div class="fc-sources">
-        <span class="fc-source">StockX</span>
-        <span class="fc-source">GOAT</span>
-        <span class="fc-source">Nike</span>
-      </div>
-    </div>
-    <div class="float-card">
-      <div class="fc-label">Price Drop Alert 📉</div>
-      <div class="fc-name">Adidas Yeezy Boost 350 V2 Zebra</div>
-      <div class="fc-row">
-        <div class="fc-price">$320</div>
-        <div class="fc-change down">▼ 5.2%</div>
-      </div>
-      <div class="fc-sources">
-        <span class="fc-source">StockX</span>
-        <span class="fc-source">Adidas</span>
-      </div>
-    </div>
-    <div class="float-card">
-      <div class="fc-label">🔥 Best Deal Today</div>
-      <div class="fc-name">Rolex Submariner Date 126610LN</div>
-      <div class="fc-row">
-        <div class="fc-price">$10.9K</div>
-        <div class="fc-change up">▲ 8.9%</div>
-      </div>
-      <div class="fc-sources">
-        <span class="fc-source">Chrono24</span>
-        <span class="fc-source">Amazon</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- TICKER -->
-<div class="ticker-bar">
-  <div class="ticker-track" id="tickerTrack"></div>
+<p class="fine">Compare the details. Follow the source. Shop on your terms.</p>
 </div>
-
-<!-- BRANDS -->
-<section class="brands-strip">
-  <p class="brands-label">Prices pulled live from</p>
-  <div class="brands-row">
-    <div class="brand-pill">STOCKX</div>
-    <div class="brand-pill">GOAT</div>
-    <div class="brand-pill">NIKE</div>
-    <div class="brand-pill">EBAY</div>
-    <div class="brand-pill">AMAZON</div>
-    <div class="brand-pill">ADIDAS</div>
-    <div class="brand-pill">FOOT LOCKER</div>
-    <div class="brand-pill">CHRONO24</div>
-    <div class="brand-pill">NEW BALANCE</div>
-    <div class="brand-pill">ZAPPOS</div>
-    <div class="brand-pill">+ MORE</div>
-  </div>
+  <aside class="hero-art" aria-label="Explore categories">
+<div class="eyebrow">The search starts here</div>
+<div class="radar-heading">What’s on your radar?</div>
+<a class="radar-row" href="/app?q=Nike%20Dunk%20Low%20Panda">
+<span class="radar-num">01</span>
+<div>
+<strong>Sneakers</strong>
+<small>Nike, adidas, New Balance</small>
+</div>
+<span aria-hidden="true">↗</span>
+</a>
+<a class="radar-row" href="/app?q=Seiko%20Prospex">
+<span class="radar-num">02</span>
+<div>
+<strong>Watches</strong>
+<small>Seiko, Casio, Omega</small>
+</div>
+<span aria-hidden="true">↗</span>
+</a>
+<a class="radar-row" href="/app?q=Coach%20Tabby">
+<span class="radar-num">03</span>
+<div>
+<strong>Bags & accessories</strong>
+<small>Find your next everyday piece</small>
+</div>
+<span aria-hidden="true">↗</span>
+</a>
+<p class="fine">Search ideas, not a claim of current stock.<br>Availability comes from the listing source.</p>
+</aside>
 </section>
-
-<!-- FEATURES -->
-<section class="features" id="features">
-  <div class="reveal">
-    <p class="section-label">Why DripTrack</p>
-    <h2 class="section-title">BUILT FOR<br><span style="color:var(--accent)">SMART BUYERS</span></h2>
-  </div>
-  <div class="features-grid">
-    <div class="feature-card reveal reveal-delay-1">
-      <span class="feature-num">01</span>
-      <span class="feature-icon">⚡</span>
-      <h3 class="feature-title">Real-Time Prices</h3>
-      <p class="feature-desc">Prices refresh every 15 minutes across 12+ sources. You always see the freshest data, never cached numbers from last week.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-2">
-      <span class="feature-num">02</span>
-      <span class="feature-icon">🔔</span>
-      <h3 class="feature-title">Instant Alerts</h3>
-      <p class="feature-desc">Set a target price and we email + push-notify you the moment it drops. Our system checks every 30 minutes, around the clock.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-3">
-      <span class="feature-num">03</span>
-      <span class="feature-icon">✅</span>
-      <h3 class="feature-title">Authenticity Check</h3>
-      <p class="feature-desc">Every listing is scored for authenticity. Suspiciously low prices are automatically flagged so you never buy a fake.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-1">
-      <span class="feature-num">04</span>
-      <span class="feature-icon">📊</span>
-      <h3 class="feature-title">Price History Charts</h3>
-      <p class="feature-desc">See 7, 30, and 90-day price trends for any product. Know instantly if today's price is a genuine deal or just average.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-2">
-      <span class="feature-num">05</span>
-      <span class="feature-icon">⚖️</span>
-      <h3 class="feature-title">Side-by-Side Compare</h3>
-      <p class="feature-desc">Select up to 3 products and compare prices, sources, and authenticity scores side by side. Never guess which is the better deal.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-3">
-      <span class="feature-num">06</span>
-      <span class="feature-icon">❤️</span>
-      <h3 class="feature-title">Personal Watchlist</h3>
-      <p class="feature-desc">Save items you're watching and track your savings history. See exactly how much DripTrack has saved you over time.</p>
-    </div>
-  </div>
+  <div class="principles">
+<div>
+<strong>Follow the source</strong>
+<span>Retailer and data provider on every result.</span>
+</div>
+<div>
+<strong>Check the details</strong>
+<span>Size, condition and source, together.</span>
+</div>
+<div>
+<strong>Save your shortlist</strong>
+<span>Keep the listings you want to revisit.</span>
+</div>
+</div>
+  <section class="section">
+<div class="section-head">
+<div>
+<div class="eyebrow">A starting point</div>
+<h2>Nike Dunk Low Panda</h2>
+<p>Actual source results. Variants and sellers may differ.</p>
+</div>
+<a class="text-link" href="/app?q=Nike%20Dunk%20Low%20Panda">Explore results ↗</a>
+</div>
+<div id="provider-notice" aria-live="polite">
+</div>
+<div class="toolbar">
+<span id="result-status" class="status-text" role="status">
+</span>
+<label>Condition <select id="condition-filter">
+<option value="all">All conditions</option>
+<option value="new">New</option>
+<option value="used">Pre-owned</option>
+<option value="unknown">Not supplied</option>
+</select>
+</label>
+<label>Sort <select id="sort">
+<option value="relevance">By source</option>
+<option value="low">Price: low to high</option>
+<option value="high">Price: high to low</option>
+</select>
+</label>
+</div>
+<div id="results" class="catalog-grid" aria-busy="true">
+</div>
+<button class="button ghost" id="show-more" hidden style="margin-top:24px">Show more listings</button>
+<p class="fine">USD listing prices. Taxes and shipping may be extra. Size, colorway, condition and seller vary—check the original listing before buying.</p>
 </section>
-
-<!-- HOW IT WORKS -->
-<section class="how" id="how">
-  <div class="reveal">
-    <p class="section-label">How It Works</p>
-    <h2 class="section-title">THREE STEPS TO<br><span style="color:var(--accent)">SMARTER BUYING</span></h2>
-  </div>
-  <div class="steps">
-    <div class="step reveal reveal-delay-1">
-      <div class="step-num">01</div>
-      <div class="step-icon">🔍</div>
-      <h3 class="step-title">Search Any Product</h3>
-      <p class="step-desc">Type any sneaker, watch, bag or streetwear item. We scan Nike, GOAT, StockX, eBay, Amazon and more — simultaneously.</p>
-    </div>
-    <div class="step reveal reveal-delay-2">
-      <div class="step-num">02</div>
-      <div class="step-icon">📈</div>
-      <h3 class="step-title">Compare All Prices</h3>
-      <p class="step-desc">See every listing side by side with a Deal Score, authenticity check, and full price history chart. Spot the best deal in seconds.</p>
-    </div>
-    <div class="step reveal reveal-delay-3">
-      <div class="step-num">03</div>
-      <div class="step-icon">🛒</div>
-      <h3 class="step-title">Set Alerts & Buy Smart</h3>
-      <p class="step-desc">Set your target price and get notified the moment it drops. We watch 24/7 so you don't have to — buy when the time is right.</p>
-    </div>
-  </div>
+  <section class="method-banner">
+<div>
+<div class="eyebrow">Built around transparency</div>
+<h2>The price is only<br>part of the picture.</h2>
+<a class="text-link" href="/about.html">How our data works ↗</a>
+</div>
+<p>A search can return different sizes, conditions and versions of the same model. We keep the seller’s title and image together, identify the source, and show when we fetched the result. DripTrack is a discovery tool, not a seller or product authenticator.</p>
 </section>
-
-<!-- PRODUCT SHOWCASE -->
-<section class="showcase" id="products">
-  <div class="reveal" style="padding-right:48px">
-    <p class="section-label">What We Track</p>
-    <h2 class="section-title">SNEAKERS, WATCHES,<br><span style="color:var(--accent)">BAGS & MORE</span></h2>
-  </div>
-  <div class="showcase-scroll" id="showcaseScroll">
-    <!-- Cards duplicated for infinite scroll effect -->
-    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">Air Jordan 1 Retro High OG</div><div class="sc-price-row"><span class="sc-price">$289</span><span class="sc-change up">▲ 12.4%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">⌚</div><div class="sc-body"><div class="sc-cat">Watches</div><div class="sc-name">Rolex Submariner Date 41mm</div><div class="sc-price-row"><span class="sc-price">$10.9K</span><span class="sc-change up">▲ 8.9%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">👜</div><div class="sc-body"><div class="sc-cat">Bags</div><div class="sc-name">Louis Vuitton Neverfull MM</div><div class="sc-price-row"><span class="sc-price">$1,860</span><span class="sc-change up">▲ 3.4%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">🧢</div><div class="sc-body"><div class="sc-cat">Streetwear</div><div class="sc-name">Supreme Box Logo Hoodie</div><div class="sc-price-row"><span class="sc-price">$420</span><span class="sc-change down">▼ 8.1%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">🕶️</div><div class="sc-body"><div class="sc-cat">Sunglasses</div><div class="sc-name">Ray-Ban Aviator Classic</div><div class="sc-price-row"><span class="sc-price">$168</span><span class="sc-change up">▲ 2.1%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">Yeezy Boost 350 V2 Zebra</div><div class="sc-price-row"><span class="sc-price">$320</span><span class="sc-change down">▼ 5.2%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">⌚</div><div class="sc-body"><div class="sc-cat">Watches</div><div class="sc-name">AP Royal Oak 15500ST</div><div class="sc-price-row"><span class="sc-price">$38.5K</span><span class="sc-change up">▲ 12.1%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">New Balance 550 White/Green</div><div class="sc-price-row"><span class="sc-price">$110</span><span class="sc-change down">▼ 3.7%</span></div></div></div>
-    <!-- Duplicate for loop -->
-    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">Air Jordan 1 Retro High OG</div><div class="sc-price-row"><span class="sc-price">$289</span><span class="sc-change up">▲ 12.4%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">⌚</div><div class="sc-body"><div class="sc-cat">Watches</div><div class="sc-name">Rolex Submariner Date 41mm</div><div class="sc-price-row"><span class="sc-price">$10.9K</span><span class="sc-change up">▲ 8.9%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">👜</div><div class="sc-body"><div class="sc-cat">Bags</div><div class="sc-name">Louis Vuitton Neverfull MM</div><div class="sc-price-row"><span class="sc-price">$1,860</span><span class="sc-change up">▲ 3.4%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">🧢</div><div class="sc-body"><div class="sc-cat">Streetwear</div><div class="sc-name">Supreme Box Logo Hoodie</div><div class="sc-price-row"><span class="sc-price">$420</span><span class="sc-change down">▼ 8.1%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">🕶️</div><div class="sc-body"><div class="sc-cat">Sunglasses</div><div class="sc-name">Ray-Ban Aviator Classic</div><div class="sc-price-row"><span class="sc-price">$168</span><span class="sc-change up">▲ 2.1%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">Yeezy Boost 350 V2 Zebra</div><div class="sc-price-row"><span class="sc-price">$320</span><span class="sc-change down">▼ 5.2%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">⌚</div><div class="sc-body"><div class="sc-cat">Watches</div><div class="sc-name">AP Royal Oak 15500ST</div><div class="sc-price-row"><span class="sc-price">$38.5K</span><span class="sc-change up">▲ 12.1%</span></div></div></div>
-    <div class="showcase-card"><div class="sc-img">👟</div><div class="sc-body"><div class="sc-cat">Sneakers</div><div class="sc-name">New Balance 550 White/Green</div><div class="sc-price-row"><span class="sc-price">$110</span><span class="sc-change down">▼ 3.7%</span></div></div></div>
-  </div>
-</section>
-
-<!-- SOCIAL PROOF -->
-<section class="social-proof" id="proof">
-  <div class="reveal">
-    <p class="section-label">Trusted By Buyers</p>
-    <h2 class="section-title">REAL PEOPLE,<br><span style="color:var(--accent)">REAL SAVINGS</span></h2>
-  </div>
-  <div class="stats-big">
-    <div class="stat-big-card reveal reveal-delay-1"><div class="stat-big-num">$2.4M+</div><div class="stat-big-label">Saved By Users</div></div>
-    <div class="stat-big-card reveal reveal-delay-2"><div class="stat-big-num">98%</div><div class="stat-big-label">Authentic Listings</div></div>
-    <div class="stat-big-card reveal reveal-delay-3"><div class="stat-big-num">50K+</div><div class="stat-big-label">Products Tracked</div></div>
-    <div class="stat-big-card reveal"><div class="stat-big-num">4.9★</div><div class="stat-big-label">User Rating</div></div>
-  </div>
-  <div class="testimonials">
-    <div class="testimonial reveal reveal-delay-1">
-      <p class="testimonial-text">DripTrack saved me $340 on a pair of Jordan 4s. The alert went off at 2am and I bought them before anyone else could. Absolute game changer.</p>
-      <div class="testimonial-author">
-        <div class="testimonial-avatar">J</div>
-        <div><div class="testimonial-name">Jordan M.</div><div class="testimonial-handle">@sneakerhead_jm · Sneaker Collector</div></div>
-      </div>
-    </div>
-    <div class="testimonial reveal reveal-delay-2">
-      <p class="testimonial-text">I track Rolex prices here every day. The authenticity checker flagged a listing that was clearly too good — saved me from a fake. Worth every second.</p>
-      <div class="testimonial-author">
-        <div class="testimonial-avatar">A</div>
-        <div><div class="testimonial-name">Alex R.</div><div class="testimonial-handle">@watchguy_alex · Watch Enthusiast</div></div>
-      </div>
-    </div>
-    <div class="testimonial reveal reveal-delay-3">
-      <p class="testimonial-text">Finally something that actually tracks luxury bag prices in real-time. I compared 6 sources for my LV Neverfull and saved $200 over what I would've paid.</p>
-      <div class="testimonial-author">
-        <div class="testimonial-avatar">S</div>
-        <div><div class="testimonial-name">Sarah K.</div><div class="testimonial-handle">@luxelifestyle · Bag Collector</div></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- CTA -->
-<section class="cta-section">
-  <h2 class="cta-title reveal">START TRACKING<br><span class="accent">FOR FREE.</span></h2>
-  <p class="cta-sub reveal">No credit card. No catch. Set your first alert in 60 seconds.</p>
-  <div class="cta-buttons reveal">
-    <a href="/register.html" class="btn-primary"><span>Create Free Account →</span></a>
-    <a href="/app" class="btn-secondary">Browse Without Signing Up</a>
-  </div>
-  <p class="cta-note reveal">Already have an account? <a href="/login.html" style="color:var(--accent);text-decoration:none">Sign in →</a></p>
-</section>
-
-<!-- FOOTER -->
-<footer>
-  <div class="footer-top">
-    <div class="footer-brand">
-      <span class="footer-logo">DRIPTRACK</span>
-      <p class="footer-tagline">Real Prices. Real Products. Real Time.</p>
-      <p class="footer-desc">Real-time price intelligence for sneakers, watches, bags and streetwear. Only authentic products tracked.</p>
-    </div>
-    <div>
-      <p class="footer-col-title">Product</p>
-      <ul class="footer-links">
-        <li><a href="/app">Price Tracker</a></li>
-        <li><a href="/watchlist.html">My Watchlist</a></li>
-        <li><a href="/account.html">Price Alerts</a></li>
-        <li><a href="/register.html">Create Account</a></li>
-      </ul>
-    </div>
-    <div>
-      <p class="footer-col-title">Categories</p>
-      <ul class="footer-links">
-        <li><a href="/app?q=sneakers">Sneakers</a></li>
-        <li><a href="/app?q=watches">Watches</a></li>
-        <li><a href="/app?q=bags">Bags</a></li>
-        <li><a href="/app?q=streetwear">Streetwear</a></li>
-      </ul>
-    </div>
-    <div>
-      <p class="footer-col-title">Company</p>
-      <ul class="footer-links">
-        <li><a href="#">About</a></li>
-        <li><a href="#">Blog</a></li>
-        <li><a href="#">Privacy Policy</a></li>
-        <li><a href="#">Terms of Service</a></li>
-      </ul>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    <span class="footer-copy">© 2026 DRIPTRACK. All rights reserved.</span>
-    <div class="footer-status"><span class="live-dot"></span> All systems operational</div>
-  </div>
+</main>
+<footer class="site-footer">
+<div class="wrap">
+<div class="footer-top">
+<div>
+<a class="brand" href="/">
+<span class="brandmark" aria-hidden="true">dt</span>driptrack</a>
+<p class="fine">Good taste. Better informed.</p>
+</div>
+<div class="footer-links">
+<a href="/app">Explore</a>
+<a href="/about.html#sources">Data & methodology</a>
+<a href="/about.html#privacy">Privacy</a>
+<a href="/account.html">Your account</a>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 DripTrack</span>
+<span>Prices are source-reported snapshots. Confirm details with the seller.<br>DripTrack does not sell or authenticate products.</span>
+</div>
+</div>
 </footer>
-
-<script>
-// ── CURSOR
-(function(){var s=document.createElement('style');s.textContent='html,body,*,*::before,*::after{cursor:none!important}';document.documentElement.appendChild(s);})();
-const cursor=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
-document.addEventListener('mousemove',e=>{cursor.style.opacity='1';ring.style.opacity='0.5';cursor.style.left=(e.clientX-6)+'px';cursor.style.top=(e.clientY-6)+'px';ring.style.left=(e.clientX-18)+'px';ring.style.top=(e.clientY-18)+'px';});
-document.addEventListener('mouseleave',()=>{cursor.style.opacity='0';ring.style.opacity='0';});
-document.addEventListener('mouseover',e=>{if(e.target.closest('button,a,input')){cursor.style.transform='scale(2.5)';ring.style.transform='scale(1.5)';}else{cursor.style.transform='scale(1)';ring.style.transform='scale(1)';}});
-
-// ── NAV SCROLL EFFECT
-window.addEventListener('scroll',()=>{
-  document.getElementById('mainNav').classList.toggle('scrolled',window.scrollY>60);
-});
-
-// ── MOBILE MENU
-function toggleMenu(){
-  document.getElementById('mobileMenu').classList.toggle('open');
-}
-document.getElementById('mobileMenu').addEventListener('click',e=>{if(e.target.tagName==='A')toggleMenu();});
-
-// ── TICKER
-const tickerData=[
-  {n:'Air Jordan 1 Chicago',p:'$289',c:'+12.4%',up:true},
-  {n:'Yeezy 350 Zebra',p:'$320',c:'-5.2%',up:false},
-  {n:'Rolex Submariner',p:'$10.9K',c:'+8.9%',up:true},
-  {n:'LV Neverfull MM',p:'$1,860',c:'+3.4%',up:true},
-  {n:'Supreme Box Logo',p:'$420',c:'-8.1%',up:false},
-  {n:'AP Royal Oak',p:'$38.5K',c:'+12.1%',up:true},
-  {n:'Nike Dunk Low Panda',p:'$145',c:'+4.2%',up:true},
-  {n:'Adidas Samba OG',p:'$100',c:'+14.2%',up:true},
-  {n:'Hermès Birkin 30',p:'$24K',c:'+9.8%',up:true},
-  {n:'Chanel Classic Flap',p:'$8.2K',c:'+7.4%',up:true},
-  {n:'NB 550 White/Green',p:'$110',c:'-3.7%',up:false},
-  {n:'Off-White x AF1',p:'$650',c:'+5.3%',up:true},
-];
-const html=tickerData.map(t=>`<span class="ticker-item"><span class="n">${t.n}</span><span class="p">${t.p}</span><span class="${t.up?'up':'dn'}">${t.up?'▲':'▼'}${t.c.replace(/[+-]/,'')}</span></span>`).join('');
-document.getElementById('tickerTrack').innerHTML=html+html;
-
-// ── COUNTER ANIMATION
-function animateCount(el){
-  const target=+el.dataset.target;
-  let current=0;
-  const step=target/60;
-  const timer=setInterval(()=>{
-    current=Math.min(current+step,target);
-    el.textContent=Math.floor(current);
-    if(current>=target){el.textContent=target;clearInterval(timer);}
-  },20);
-}
-const counters=document.querySelectorAll('.stat-num[data-target]');
-const countObs=new IntersectionObserver(entries=>{
-  entries.forEach(e=>{if(e.isIntersecting){animateCount(e.target);countObs.unobserve(e.target);}});
-},{threshold:0.5});
-counters.forEach(c=>countObs.observe(c));
-
-// ── SCROLL REVEAL
-const revealObs=new IntersectionObserver(entries=>{
-  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});
-},{threshold:0.1,rootMargin:'0px 0px -40px 0px'});
-document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
-
-// Auth check is now at the top of <head> — no duplicate needed here
-</script>
-
-<!-- ═══════════════════════════════════════════════════════════════
-     DRIPTRACK 3D ANIMATION SYSTEM — landing page
-═══════════════════════════════════════════════════════════════ -->
-<style>
-/* ── Scroll progress bar ── */
-#scroll-prog{position:fixed;top:0;left:0;height:2px;width:0%;background:linear-gradient(90deg,#e8ff00,#00f0ff);z-index:9999;transition:width 0.1s linear;pointer-events:none;}
-
-/* ── Card tilt setup ── */
-.feature-card,.float-card,.step-card,.testimonial-card{transform-style:preserve-3d;will-change:transform;}
-.card-shine{position:absolute;inset:0;pointer-events:none;z-index:10;border-radius:inherit;transition:background 0.15s;}
-
-/* ── Holographic shimmer on feature icons ── */
-.feature-icon{
-  display:inline-block;
-  font-size:36px;
-  filter:drop-shadow(0 0 8px rgba(232,255,0,0.5));
-  animation:iconFloat 3s ease-in-out infinite;
-}
-.feature-card:nth-child(2) .feature-icon{animation-delay:0.4s;}
-.feature-card:nth-child(3) .feature-icon{animation-delay:0.8s;}
-.feature-card:nth-child(4) .feature-icon{animation-delay:1.2s;}
-.feature-card:nth-child(5) .feature-icon{animation-delay:1.6s;}
-.feature-card:nth-child(6) .feature-icon{animation-delay:2.0s;}
-@keyframes iconFloat{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-6px) rotate(3deg);}}
-
-/* ── Floating orbs in hero ── */
-.hero-orb{position:absolute;border-radius:50%;pointer-events:none;animation:orbDrift linear infinite;}
-@keyframes orbDrift{0%{transform:translateY(0) translateX(0) scale(1);}25%{transform:translateY(-30px) translateX(20px) scale(1.05);}50%{transform:translateY(-15px) translateX(-10px) scale(0.95);}75%{transform:translateY(-40px) translateX(15px) scale(1.02);}100%{transform:translateY(0) translateX(0) scale(1);}}
-
-/* ── Glitch text ── */
-.glitch{position:relative;}
-.glitch::before,.glitch::after{content:attr(data-text);position:absolute;inset:0;background:transparent;}
-.glitch::before{color:#e8ff00;animation:glitchA 3s infinite;clip-path:polygon(0 20%,100% 20%,100% 40%,0 40%);}
-.glitch::after{color:#ff3c3c;animation:glitchB 3s infinite;clip-path:polygon(0 60%,100% 60%,100% 80%,0 80%);}
-@keyframes glitchA{0%,90%,100%{transform:translate(0);opacity:0;}91%{transform:translate(-3px,1px);opacity:0.8;}92%{transform:translate(3px,-1px);opacity:0.8;}93%{transform:translate(0);opacity:0;}}
-@keyframes glitchB{0%,88%,100%{transform:translate(0);opacity:0;}89%{transform:translate(3px,2px);opacity:0.6;}90%{transform:translate(-3px,-2px);opacity:0.6;}91%{transform:translate(0);opacity:0;}}
-
-/* ── Magnetic button transition ── */
-.btn-primary,.btn-secondary,.btn-nav-cta{transition:transform 0.4s cubic-bezier(0.23,1,0.32,1),background 0.2s,color 0.2s!important;}
-
-/* ── Particle burst ── */
-.burst-particle{position:fixed;border-radius:50%;pointer-events:none;z-index:9999;}
-
-/* ── Scanline overlay ── */
-.hero::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:2;animation:scanMove 8s linear infinite;}
-@keyframes scanMove{0%{background-position:0 0;}100%{background-position:0 80px;}}
-
-/* ── Number flip ── */
-@keyframes numFlip{0%{transform:translateY(-100%);opacity:0;}60%{transform:translateY(8px);}100%{transform:translateY(0);opacity:1;}}
-.stat-num{display:inline-block;}
-</style>
-
-<div id="scroll-prog"></div>
-
-<script>
-/* ══════════════════════════════════════════════════════
-   1. SCROLL PROGRESS BAR
-══════════════════════════════════════════════════════ */
-(function(){
-  const bar = document.getElementById('scroll-prog');
-  window.addEventListener('scroll',()=>{
-    const pct = (window.scrollY/(document.documentElement.scrollHeight-window.innerHeight))*100;
-    bar.style.width = Math.min(pct,100)+'%';
-  },{passive:true});
-})();
-
-/* ══════════════════════════════════════════════════════
-   2. 3D PARTICLE NETWORK — hero background canvas
-══════════════════════════════════════════════════════ */
-(function initParticleNet(){
-  const hero = document.querySelector('.hero');
-  if(!hero) return;
-  const canvas = document.createElement('canvas');
-  canvas.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;';
-  hero.style.overflow='hidden';
-  hero.insertBefore(canvas, hero.firstChild);
-  const ctx = canvas.getContext('2d');
-  let W,H,particles=[],mouse={x:-999,y:-999};
-  const ACCENT='232,255,0';
-  const BLUE='0,240,255';
-
-  function resize(){
-    W=canvas.width=hero.offsetWidth;
-    H=canvas.height=hero.offsetHeight;
-  }
-
-  class P{
-    constructor(){this.reset();}
-    reset(){
-      this.x=Math.random()*W;
-      this.y=Math.random()*H;
-      this.z=Math.random();          // depth 0–1
-      this.vx=(Math.random()-.5)*0.5;
-      this.vy=(Math.random()-.5)*0.3;
-      this.r=0.8+this.z*1.8;
-      this.a=0.2+this.z*0.6;
-      this.color=Math.random()>.7?BLUE:ACCENT;
-    }
-    tick(){
-      const dx=this.x-mouse.x, dy=this.y-mouse.y;
-      const d=Math.sqrt(dx*dx+dy*dy);
-      if(d<140){const f=(140-d)/140*4;this.x+=dx/d*f;this.y+=dy/d*f;}
-      this.x+=this.vx; this.y+=this.vy;
-      if(this.x<0)this.x=W; if(this.x>W)this.x=0;
-      if(this.y<0)this.y=H; if(this.y>H)this.y=0;
-    }
-    draw(){
-      ctx.beginPath();
-      ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
-      ctx.fillStyle=`rgba(${this.color},${this.a})`;
-      ctx.fill();
-    }
-  }
-
-  function drawLines(){
-    for(let i=0;i<particles.length;i++){
-      for(let j=i+1;j<particles.length;j++){
-        const dx=particles[i].x-particles[j].x;
-        const dy=particles[i].y-particles[j].y;
-        const d=Math.sqrt(dx*dx+dy*dy);
-        if(d<120){
-          const a=(1-d/120)*0.25;
-          ctx.beginPath();
-          ctx.moveTo(particles[i].x,particles[i].y);
-          ctx.lineTo(particles[j].x,particles[j].y);
-          ctx.strokeStyle=`rgba(${ACCENT},${a})`;
-          ctx.lineWidth=0.6;
-          ctx.stroke();
-        }
-      }
-    }
-  }
-
-  function frame(){
-    ctx.clearRect(0,0,W,H);
-    particles.forEach(p=>{p.tick();p.draw();});
-    drawLines();
-    requestAnimationFrame(frame);
-  }
-
-  hero.addEventListener('mousemove',e=>{
-    const r=canvas.getBoundingClientRect();
-    mouse.x=e.clientX-r.left; mouse.y=e.clientY-r.top;
-  },{passive:true});
-
-  window.addEventListener('resize',()=>{resize(); particles=Array.from({length:90},()=>new P());},{passive:true});
-  resize();
-  particles=Array.from({length:90},()=>new P());
-  frame();
-})();
-
-/* ══════════════════════════════════════════════════════
-   3. 3D CARD TILT — feature cards, float cards, testimonials
-══════════════════════════════════════════════════════ */
-function addTilt(els, strength=14){
-  els.forEach(el=>{
-    // Shine overlay
-    if(!el.querySelector('.card-shine')){
-      const s=document.createElement('div');
-      s.className='card-shine';
-      el.style.position='relative';
-      el.style.overflow='hidden';
-      el.appendChild(s);
-    }
-    el.addEventListener('mousemove',e=>{
-      const r=el.getBoundingClientRect();
-      const x=(e.clientX-r.left)/r.width -.5;
-      const y=(e.clientY-r.top) /r.height-.5;
-      el.style.transition='transform 0.08s ease';
-      el.style.transform=`perspective(900px) rotateX(${-y*strength}deg) rotateY(${x*strength}deg) translateZ(12px)`;
-      const shine=el.querySelector('.card-shine');
-      if(shine) shine.style.background=`radial-gradient(circle at ${(x+.5)*100}% ${(y+.5)*100}%,rgba(255,255,255,0.12) 0%,transparent 65%)`;
-    });
-    el.addEventListener('mouseleave',()=>{
-      el.style.transition='transform 0.7s cubic-bezier(0.23,1,0.32,1)';
-      el.style.transform='perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0)';
-      const shine=el.querySelector('.card-shine');
-      if(shine) shine.style.background='transparent';
-    });
-  });
-}
-
-// Wait for DOM
-window.addEventListener('load',()=>{
-  addTilt(document.querySelectorAll('.feature-card'), 10);
-  addTilt(document.querySelectorAll('.float-card'), 8);
-  addTilt(document.querySelectorAll('.testimonial-card'), 6);
-  addTilt(document.querySelectorAll('.step-card'), 8);
-});
-
-/* ══════════════════════════════════════════════════════
-   4. GLITCH on hero title
-══════════════════════════════════════════════════════ */
-(function(){
-  const title=document.querySelector('.hero-title');
-  if(!title) return;
-  const lines=title.querySelectorAll('span,br');
-  // Add glitch to accent line
-  const accent=title.querySelector('.line-accent');
-  if(accent){
-    accent.classList.add('glitch');
-    accent.setAttribute('data-text',accent.textContent);
-  }
-})();
-
-/* ══════════════════════════════════════════════════════
-   5. TEXT SCRAMBLE on hero eyebrow
-══════════════════════════════════════════════════════ */
-(function(){
-  const el=document.querySelector('.hero-eyebrow');
-  if(!el) return;
-  const original=el.textContent;
-  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$#@!';
-  let frame=0,total=60;
-  function tick(){
-    el.textContent=original.split('').map((c,i)=>{
-      if(c===' '||c==='.') return c;
-      if(frame/total > i/original.length) return c;
-      return chars[Math.floor(Math.random()*chars.length)];
-    }).join('');
-    if(frame++<total) requestAnimationFrame(tick);
-    else el.textContent=original;
-  }
-  setTimeout(tick,600);
-})();
-
-/* ══════════════════════════════════════════════════════
-   6. MAGNETIC BUTTONS
-══════════════════════════════════════════════════════ */
-(function(){
-  document.querySelectorAll('.btn-primary,.btn-secondary,.btn-nav-cta,.btn-nav-ghost').forEach(btn=>{
-    btn.addEventListener('mousemove',e=>{
-      const r=btn.getBoundingClientRect();
-      const x=e.clientX-r.left-r.width/2;
-      const y=e.clientY-r.top -r.height/2;
-      btn.style.transform=`translate(${x*.25}px,${y*.25}px)`;
-    });
-    btn.addEventListener('mouseleave',()=>{
-      btn.style.transform='translate(0,0)';
-    });
-  });
-})();
-
-/* ══════════════════════════════════════════════════════
-   7. FLOATING PRICE ORBS in hero
-══════════════════════════════════════════════════════ */
-(function(){
-  const hero=document.querySelector('.hero');
-  if(!hero) return;
-  const orbs=[
-    {label:'$289',x:72,y:20,dur:7,color:'rgba(232,255,0,0.12)'},
-    {label:'$11.2K',x:80,y:55,dur:9,color:'rgba(0,240,255,0.10)'},
-    {label:'-5.2%',x:15,y:65,dur:8,color:'rgba(255,60,60,0.10)'},
-    {label:'$320',x:60,y:80,dur:6,color:'rgba(232,255,0,0.08)'},
-    {label:'HOT🔥',x:88,y:30,dur:11,color:'rgba(255,140,0,0.10)'},
-  ];
-  orbs.forEach(o=>{
-    const el=document.createElement('div');
-    el.className='hero-orb';
-    el.textContent=o.label;
-    el.style.cssText=`
-      left:${o.x}%;top:${o.y}%;
-      width:72px;height:72px;
-      background:${o.color};
-      border:1px solid rgba(232,255,0,0.2);
-      backdrop-filter:blur(4px);
-      display:flex;align-items:center;justify-content:center;
-      font-family:'Space Mono',monospace;font-size:11px;font-weight:700;
-      color:#e8ff00;letter-spacing:1px;
-      animation-duration:${o.dur}s;
-      z-index:2;
-    `;
-    hero.appendChild(el);
-  });
-})();
-
-/* ══════════════════════════════════════════════════════
-   8. PARTICLE BURST utility (reusable)
-══════════════════════════════════════════════════════ */
-window.particleBurst=function(x,y,color='#e8ff00'){
-  for(let i=0;i<20;i++){
-    const p=document.createElement('div');
-    const angle=(i/20)*Math.PI*2;
-    const spd=50+Math.random()*80;
-    const sz=2+Math.random()*4;
-    p.style.cssText=`position:fixed;left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;background:${color};border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%)`;
-    document.body.appendChild(p);
-    let t=0;
-    const dx=Math.cos(angle)*spd, dy=Math.sin(angle)*spd;
-    (function anim(){
-      t+=0.04;
-      p.style.left=(x+dx*t)+'px';
-      p.style.top=(y+dy*t+120*t*t)+'px';
-      p.style.opacity=String(1-t);
-      p.style.transform=`translate(-50%,-50%) scale(${1-t})`;
-      if(t<1) requestAnimationFrame(anim); else p.remove();
-    })();
-  }
-};
-
-// Burst on CTA clicks
-document.querySelectorAll('.btn-primary').forEach(btn=>{
-  btn.addEventListener('click',e=>{
-    window.particleBurst(e.clientX,e.clientY,'#e8ff00');
-  });
-});
-
-/* ══════════════════════════════════════════════════════
-   9. BRAND PILL infinite scroll speed-up on hover
-══════════════════════════════════════════════════════ */
-(function(){
-  const row=document.querySelector('.brands-row');
-  if(!row) return;
-  row.addEventListener('mouseenter',()=>{row.style.animationPlayState='paused';});
-  row.addEventListener('mouseleave',()=>{row.style.animationPlayState='running';});
-})();
-
-/* ══════════════════════════════════════════════════════
-   10. COUNTER — slot-machine flip animation
-══════════════════════════════════════════════════════ */
-(function(){
-  const obs=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-      if(!e.isIntersecting) return;
-      obs.unobserve(e.target);
-      const el=e.target;
-      const target=parseInt(el.dataset.target);
-      const suffix=el.dataset.suffix||'';
-      let cur=0, steps=60;
-      const inc=target/steps;
-      const iv=setInterval(()=>{
-        cur=Math.min(cur+inc, target);
-        el.textContent=(target>=1000?Math.round(cur/1000)+'K':Math.round(cur))+suffix;
-        if(cur>=target){clearInterval(iv);el.textContent=(target>=1000?(target/1000)+'K':target)+suffix;}
-      },25);
-    });
-  },{threshold:0.5});
-  document.querySelectorAll('.stat-num[data-target]').forEach(el=>obs.observe(el));
-})();
-</script>
+<div id="toast" class="toast" role="status" hidden>
+</div>
 </body>
 </html>

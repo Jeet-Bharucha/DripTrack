@@ -1,503 +1,80 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>DRIPTRACK — Login</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet"/>
-<style>
-:root{
-  --black:#0a0a0a;--grey-900:#111;--grey-800:#1a1a1a;--grey-700:#252525;
-  --grey-600:#333;--grey-400:#666;--grey-200:#aaa;--white:#f0f0f0;
-  --accent:#e8ff00;--accent2:#ff3c3c;--up:#39ff14;
-}
-*{margin:0;padding:0;box-sizing:border-box;cursor:none !important;}
-html,body,*,*::before,*::after{cursor:none !important;}
-body{background:var(--black);color:var(--white);font-family:'Barlow Condensed',sans-serif;min-height:100vh;display:flex;overflow:hidden;cursor:none !important;}
-
-/* CURSOR */
-.cursor{position:fixed;width:10px;height:10px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;opacity:0;transition:transform 0.1s ease;mix-blend-mode:difference;}
-.cursor-ring{position:fixed;width:32px;height:32px;border:1px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;opacity:0;transition:all 0.15s ease;}
-
-/* GRID BG */
-body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;z-index:0;}
-
-/* LEFT PANEL */
-.left-panel{
-  width:55%;position:relative;overflow:hidden;
-  background:linear-gradient(135deg,#0a0a0a 0%,#111 50%,#0a0a0a 100%);
-  border-right:1px solid var(--grey-700);
-  display:flex;flex-direction:column;justify-content:space-between;padding:60px;
-}
-.left-panel::after{
-  content:'';position:absolute;inset:0;
-  background:radial-gradient(ellipse 80% 60% at 30% 50%,rgba(232,255,0,0.04) 0%,transparent 70%);
-  pointer-events:none;
-}
-
-.brand{position:relative;z-index:2;}
-.brand-logo{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:6px;color:var(--accent);text-shadow:0 0 30px rgba(232,255,0,0.3);text-decoration:none;display:block;}
-.brand-logo span{color:var(--white);}
-.brand-tag{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--grey-400);margin-top:6px;text-transform:uppercase;}
-
-.left-content{position:relative;z-index:2;}
-.left-headline{font-family:'Bebas Neue',sans-serif;font-size:clamp(52px,6vw,88px);line-height:0.9;letter-spacing:2px;margin-bottom:24px;}
-.left-headline .outline{color:transparent;-webkit-text-stroke:1px rgba(240,240,240,0.2);}
-.left-headline .accent{color:var(--accent);}
-.left-desc{font-family:'Barlow Condensed',sans-serif;font-size:17px;color:var(--grey-200);letter-spacing:1px;line-height:1.6;max-width:380px;margin-bottom:40px;}
-
-.stats-row{display:flex;gap:40px;}
-.stat-item{}
-.stat-num{font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--accent);letter-spacing:2px;line-height:1;}
-.stat-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-400);margin-top:3px;text-transform:uppercase;}
-
-/* TICKER */
-.ticker-wrap{overflow:hidden;border-top:1px solid var(--grey-700);padding-top:20px;position:relative;z-index:2;}
-.ticker-inner{display:flex;gap:0;animation:tick 20s linear infinite;white-space:nowrap;}
-.tick-item{display:inline-flex;align-items:center;gap:8px;padding:0 24px;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;border-right:1px solid var(--grey-700);}
-.tick-item .n{color:var(--grey-200);}
-.tick-item .p{color:var(--white);font-weight:700;}
-.tick-item .up{color:var(--up);}
-.tick-item .dn{color:var(--accent2);}
-@keyframes tick{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
-
-/* RIGHT PANEL — LOGIN FORM */
-.right-panel{
-  width:45%;display:flex;align-items:center;justify-content:center;
-  padding:60px 56px;position:relative;z-index:1;
-}
-
-.form-wrap{width:100%;max-width:380px;}
-
-.form-eyebrow{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:12px;}
-.form-eyebrow::before{content:'// ';opacity:0.5;}
-.form-title{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;line-height:1;margin-bottom:8px;}
-.form-sub{font-family:'Barlow Condensed',sans-serif;font-size:15px;color:var(--grey-400);letter-spacing:1px;margin-bottom:40px;}
-.form-sub a{color:var(--accent);text-decoration:none;}
-.form-sub a:hover{text-decoration:underline;}
-
-.field{margin-bottom:20px;}
-.field-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--grey-200);text-transform:uppercase;margin-bottom:8px;display:block;}
-.field-wrap{position:relative;}
-.field-input{
-  width:100%;background:var(--grey-900);border:1px solid var(--grey-700);
-  color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:18px;
-  font-weight:600;letter-spacing:1px;padding:14px 16px;outline:none;
-  transition:border-color 0.2s;
-}
-.field-input:focus{border-color:var(--accent);}
-.field-input::placeholder{color:var(--grey-600);}
-.field-input.error{border-color:var(--accent2);}
-
-.password-toggle{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--grey-400);cursor:none;font-size:14px;transition:color 0.2s;padding:4px;}
-.password-toggle:hover{color:var(--accent);}
-
-.field-error{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent2);letter-spacing:1px;margin-top:6px;display:none;}
-.field-error.show{display:block;}
-
-.forgot{display:block;text-align:right;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-400);text-decoration:none;margin-top:8px;transition:color 0.2s;}
-.forgot:hover{color:var(--accent);}
-
-.submit-btn{
-  width:100%;background:var(--accent);border:none;color:var(--black);
-  font-family:'Space Mono',monospace;font-size:13px;letter-spacing:3px;
-  font-weight:700;text-transform:uppercase;padding:18px;cursor:none;
-  margin-top:32px;transition:all 0.2s;position:relative;overflow:hidden;
-}
-.submit-btn::after{content:'';position:absolute;inset:0;background:var(--white);transform:translateX(-101%);transition:transform 0.25s ease;}
-.submit-btn:hover::after{transform:translateX(0);}
-.submit-btn span{position:relative;z-index:1;}
-.submit-btn:disabled{background:var(--grey-700);color:var(--grey-400);cursor:not-allowed;}
-.submit-btn:disabled::after{display:none;}
-
-.divider{display:flex;align-items:center;gap:16px;margin:28px 0;}
-.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--grey-700);}
-.divider span{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--grey-600);text-transform:uppercase;}
-
-.social-row{display:flex;gap:12px;}
-.social-btn{
-  flex:1;background:var(--grey-900);border:1px solid var(--grey-700);
-  color:var(--white);font-family:'Space Mono',monospace;font-size:10px;
-  letter-spacing:1px;text-transform:uppercase;padding:13px;cursor:none;
-  transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;
-}
-.social-btn:hover{border-color:var(--accent);color:var(--accent);}
-
-.form-footer{margin-top:32px;text-align:center;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--grey-600);}
-.form-footer a{color:var(--grey-400);text-decoration:none;transition:color 0.2s;}
-.form-footer a:hover{color:var(--accent);}
-
-/* SUCCESS STATE */
-.success-msg{
-  display:none;text-align:center;padding:40px 0;
-  animation:fadeUp 0.5s ease;
-}
-.success-msg.show{display:block;}
-.success-icon{font-size:48px;margin-bottom:16px;}
-.success-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;color:var(--up);margin-bottom:8px;}
-.success-desc{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--grey-400);}
-
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
-
-@media(max-width:768px){
-  body{flex-direction:column;overflow-y:auto;}
-  /* Hide decorative left panel on mobile — just show the form */
-  .left-panel{display:none;}
-  .right-panel{
-    width:100%;min-height:100dvh;
-    padding:48px 24px 40px;
-    align-items:flex-start;
-  }
-  .form-wrap{max-width:100%;}
-  /* Add brand header at top since left panel is hidden */
-  .right-panel::before{
-    content:'DRIPTRACK';
-    font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:5px;
-    color:#e8ff00;display:block;margin-bottom:32px;
-  }
-}
-@media(max-width:480px){
-  .right-panel{padding:40px 20px 32px;}
-  .social-btn{font-size:12px;padding:12px 16px;}
-}
-</style>
-</head>
-<body>
-
-<div class="cursor" id="cursor"></div>
-<div class="cursor-ring" id="cursorRing"></div>
-
-<!-- LEFT PANEL -->
-<div class="left-panel">
-  <div class="brand">
-    <a href="/" class="brand-logo">DRIP<span>TRACK</span></a>
-    <div class="brand-tag">Real Prices. Real Products. Real Time.</div>
-  </div>
-
-  <div class="left-content">
-    <h1 class="left-headline">
-      TRACK<br>
-      <span class="outline">EVERY</span><br>
-      <span class="accent">PRICE</span>
-    </h1>
-    <p class="left-desc">Sign in to track your favorite sneakers, watches, bags and streetwear across every major retailer — in real time.</p>
-    <div class="stats-row">
-      <div class="stat-item"><div class="stat-num">50K+</div><div class="stat-label">Products</div></div>
-      <div class="stat-item"><div class="stat-num">12</div><div class="stat-label">Sources</div></div>
-      <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">Authentic</div></div>
-    </div>
-  </div>
-
-  <div class="ticker-wrap">
-    <div class="ticker-inner" id="ticker"></div>
-  </div>
-</div>
-
-<!-- RIGHT PANEL -->
-<div class="right-panel">
-  <div class="form-wrap">
-
-    <div id="loginForm">
-      <p class="form-eyebrow">Welcome Back</p>
-      <h2 class="form-title">SIGN IN</h2>
-      <p class="form-sub">No account? <a href="register.html">Create one free →</a></p>
-
-      <div class="field">
-        <label class="field-label" for="email">Email Address</label>
-        <div class="field-wrap">
-          <input type="email" id="email" class="field-input" placeholder="you@example.com" autocomplete="email"/>
-        </div>
-        <div class="field-error" id="emailError">Please enter a valid email address</div>
-      </div>
-
-      <div class="field">
-        <label class="field-label" for="password">Password</label>
-        <div class="field-wrap">
-          <input type="password" id="password" class="field-input" placeholder="Enter your password" autocomplete="current-password"/>
-          <button class="password-toggle" onclick="togglePassword('password', this)" type="button">👁</button>
-        </div>
-        <a href="#" class="forgot" onclick="forgotPassword(event)">Forgot password?</a>
-        <div class="field-error" id="passwordError">Password must be at least 8 characters</div>
-      </div>
-
-      <div class="field-error" id="loginError" style="margin-top:8px;font-size:10px;padding:10px;background:rgba(255,60,60,0.08);border:1px solid rgba(255,60,60,0.2)"></div>
-
-      <button class="submit-btn" id="loginBtn" onclick="handleLogin()">
-        <span id="loginBtnText">Sign In →</span>
-      </button>
-
-      <div class="divider"><span>or continue with</span></div>
-
-      <div class="social-row">
-        <button class="social-btn" onclick="socialLogin('Google')" style="position:relative;overflow:hidden">
-          <svg width="16" height="16" viewBox="0 0 48 48" style="flex-shrink:0">
-            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-          </svg>
-          Continue with Google
-        </button>
-        <button class="social-btn" onclick="socialLogin('Apple')">
-          <svg width="14" height="16" viewBox="0 0 14 16" fill="currentColor" style="flex-shrink:0">
-            <path d="M13.33 11.27c-.27.61-.57 1.17-.9 1.7-.47.76-.86 1.28-1.16 1.57-.46.46-.96.7-1.5.71-.38 0-.85-.11-1.38-.34-.54-.23-1.03-.34-1.48-.34-.47 0-.97.11-1.52.34-.55.23-1 .35-1.35.36-.52.02-1.03-.23-1.52-.75-.33-.32-.73-.86-1.22-1.63C.75 12.06.35 11.2.08 10.2-.2 9.15-.34 8.13-.34 7.14c0-1.12.22-2.09.67-2.89.35-.62.82-1.11 1.41-1.48.59-.37 1.23-.55 1.92-.56.38 0 .88.12 1.5.36.61.24 1 .36 1.17.36.13 0 .56-.14 1.27-.43.68-.27 1.26-.38 1.73-.34 1.28.1 2.24.61 2.87 1.52-1.14.71-1.71 1.71-1.7 2.99.01 1 .35 1.83 1.01 2.48.3.3.64.53 1.01.69-.08.24-.17.47-.27.69zM10.01.32c0 .78-.27 1.51-.8 2.19-.65.81-1.44 1.27-2.29 1.2-.01-.09-.01-.18-.01-.28 0-.75.31-1.55.86-2.2.27-.33.62-.6 1.04-.82.42-.21.81-.33 1.18-.34.01.08.02.17.02.25z"/>
-          </svg>
-          Apple
-        </button>
-      </div>
-    </div>
-
-    <div class="success-msg" id="successMsg">
-      <div class="success-icon">✓</div>
-      <div class="success-title">WELCOME BACK</div>
-      <div class="success-desc" style="margin-bottom:24px">Redirecting to your dashboard...</div>
-    </div>
-
-    <div class="form-footer">
-      <a href="/">← Back to DRIPTRACK</a>
-      &nbsp;·&nbsp;
-      <a href="#">Privacy Policy</a>
-      &nbsp;·&nbsp;
-      <a href="#">Terms</a>
-    </div>
-  </div>
-</div>
-
-<script>
-(function(){var s=document.createElement('style');s.textContent='html,body,*,*::before,*::after{cursor:none!important}';document.documentElement.appendChild(s);})();
-// CURSOR
-const cursor = document.getElementById('cursor');
-const ring = document.getElementById('cursorRing');
-document.addEventListener('mousemove', e => {
-  cursor.style.opacity='1'; ring.style.opacity='0.5';
-  cursor.style.left=e.clientX-5+'px'; cursor.style.top=e.clientY-5+'px';
-  ring.style.left=e.clientX-16+'px'; ring.style.top=e.clientY-16+'px';
-});
-document.addEventListener('mouseleave',()=>{cursor.style.opacity='0';ring.style.opacity='0';});
-document.querySelectorAll('button,a,input').forEach(el=>{
-  el.addEventListener('mouseenter',()=>{cursor.style.transform='scale(2.5)';ring.style.transform='scale(1.5)';});
-  el.addEventListener('mouseleave',()=>{cursor.style.transform='scale(1)';ring.style.transform='scale(1)';});
-});
-
-// TICKER
-const ticks = [
-  {n:'Air Jordan 1 Chicago',p:'$289',c:'▲12.4%',up:true},
-  {n:'Yeezy 350 Zebra',p:'$320',c:'▼5.2%',up:false},
-  {n:'Rolex Submariner',p:'$11.2K',c:'▲8.9%',up:true},
-  {n:'LV Neverfull MM',p:'$1.9K',c:'▲3.4%',up:true},
-  {n:'Supreme Box Logo',p:'$420',c:'▼8.1%',up:false},
-  {n:'Nike Dunk Low Panda',p:'$145',c:'▲4.2%',up:true},
-];
-const ticker = document.getElementById('ticker');
-const tHTML = ticks.map(t=>`
-  <span class="tick-item">
-    <span class="n">${t.n}</span>
-    <span class="p">${t.p}</span>
-    <span class="${t.up?'up':'dn'}">${t.c}</span>
-  </span>`).join('');
-ticker.innerHTML = tHTML + tHTML;
-
-// PASSWORD TOGGLE
-function togglePassword(id, btn) {
-  const input = document.getElementById(id);
-  if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
-  else { input.type = 'password'; btn.textContent = '👁'; }
-}
-
-// VALIDATE
-function validateEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-// LOGIN HANDLER
-async function handleLogin() {
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  const btn = document.getElementById('loginBtn');
-  const btnText = document.getElementById('loginBtnText');
-  const loginError = document.getElementById('loginError');
-
-  // Clear errors
-  document.getElementById('emailError').classList.remove('show');
-  document.getElementById('passwordError').classList.remove('show');
-  document.getElementById('email').classList.remove('error');
-  document.getElementById('password').classList.remove('error');
-  loginError.classList.remove('show');
-
-  // Validate
-  let valid = true;
-  if (!validateEmail(email)) {
-    document.getElementById('emailError').classList.add('show');
-    document.getElementById('email').classList.add('error');
-    valid = false;
-  }
-  if (password.length < 8) {
-    document.getElementById('passwordError').classList.add('show');
-    document.getElementById('password').classList.add('error');
-    valid = false;
-  }
-  if (!valid) return;
-
-  // Show loading
-  btn.disabled = true;
-  btnText.textContent = 'Signing in...';
-
-  const AUTH_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? `http://${window.location.hostname}:3001/auth`
-    : `${window.location.origin}/auth`;
-
-  try {
-    const res = await fetch(`${AUTH_BASE}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-
-    if (res.ok && data.token) {
-      // Save token
-      localStorage.setItem('driptrack_token', data.token);
-      localStorage.setItem('driptrack_user', JSON.stringify(data.user));
-      // Flag so /app knows user JUST logged in → show "Welcome back" toast
-      sessionStorage.setItem('driptrack_just_logged_in', '1');
-      // Show success
-      document.getElementById('loginForm').style.display = 'none';
-      document.getElementById('successMsg').classList.add('show');
-      // Redirect after 1.5s
-      setTimeout(() => { window.location.href = '/app'; }, 1500);
-    } else {
-      loginError.textContent = data.message || 'Invalid email or password';
-      loginError.classList.add('show');
-      btn.disabled = false;
-      btnText.textContent = 'Sign In →';
-    }
-  } catch {
-    loginError.textContent = '⚠️ Cannot connect to server — make sure backend is running';
-    loginError.classList.add('show');
-    btn.disabled = false;
-    btnText.textContent = 'Sign In →';
-  }
-}
-
-async function forgotPassword(e) {
-  e.preventDefault();
-  const email = document.getElementById('email').value.trim();
-
-  if (!validateEmail(email)) {
-    document.getElementById('emailError').classList.add('show');
-    document.getElementById('email').classList.add('error');
-    document.getElementById('email').focus();
-    return;
-  }
-
-  // Show loading state on the forgot link
-  const link = document.querySelector('.forgot');
-  const originalText = link.textContent;
-  link.textContent = 'Sending...';
-  link.style.color = 'var(--accent)';
-
-  const _authBase2 = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? `http://${window.location.hostname}:3001/auth`
-    : `${window.location.origin}/auth`;
-
-  try {
-    const res = await fetch(`${_authBase2}/forgot-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json();
-
-    // Always show success message (security best practice — don't reveal if email exists)
-    link.textContent = originalText;
-    link.style.color = '';
-
-    // Show success message
-    const loginError = document.getElementById('loginError');
-    loginError.style.color = 'var(--up)';
-    loginError.style.background = 'rgba(57,255,20,0.08)';
-    loginError.style.borderColor = 'rgba(57,255,20,0.2)';
-    loginError.textContent = '✓ Password reset email sent to ' + email + ' — check your inbox!';
-    loginError.classList.add('show');
-
-    // Reset style after 5 seconds
-    setTimeout(() => {
-      loginError.classList.remove('show');
-      loginError.style.color = '';
-      loginError.style.background = '';
-      loginError.style.borderColor = '';
-    }, 5000);
-
-  } catch (err) {
-    link.textContent = originalText;
-    link.style.color = '';
-    const loginError = document.getElementById('loginError');
-    loginError.style.color = '';
-    loginError.textContent = '⚠️ Cannot connect to server — make sure backend is running';
-    loginError.classList.add('show');
-  }
-}
-
-// ─── GOOGLE OAUTH ───
-function socialLogin(provider) {
-  if (provider === 'Google') {
-    // Redirect to backend Google OAuth route
-    const AUTH_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      ? `http://${window.location.hostname}:3001/auth`
-      : `${window.location.origin}/auth`;
-    window.location.href = `${AUTH_BASE}/google`;
-  } else if (provider === 'Apple') {
-    const err = document.getElementById('loginError');
-    err.style.color = 'var(--accent)';
-    err.style.background = 'rgba(232,255,0,0.05)';
-    err.style.borderColor = 'rgba(232,255,0,0.2)';
-    err.textContent = '🍎 Apple Sign In coming soon — use email/password for now.';
-    err.classList.add('show');
-    setTimeout(() => { err.classList.remove('show'); err.style.color=''; err.style.background=''; err.style.borderColor=''; }, 4000);
-  }
-}
-
-// Handle Google OAuth callback token in URL (after redirect back from Google)
-(function() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
-  const userParam = params.get('user');
-  const errorParam = params.get('error');
-
-  // Show error if Google OAuth failed
-  if (errorParam) {
-    const err = document.getElementById('loginError');
-    const msgs = {
-      google_cancelled: 'Google sign-in was cancelled.',
-      google_failed: 'Google sign-in failed — please try again.',
-      google_no_email: 'Could not get email from Google.',
-      google_not_configured: 'Google sign-in is not configured yet.',
-    };
-    err.textContent = '⚠️ ' + (msgs[errorParam] || 'Something went wrong with Google sign-in.');
-    err.classList.add('show');
-  }
-
-  if (token && userParam) {
-    try {
-      const user = JSON.parse(decodeURIComponent(userParam));
-      localStorage.setItem('driptrack_token', token);
-      localStorage.setItem('driptrack_user', JSON.stringify(user));
-      // Flag so the landing page knows user JUST logged in
-      sessionStorage.setItem('driptrack_just_logged_in', '1');
-      document.getElementById('loginForm').style.display = 'none';
-      document.getElementById('successMsg').classList.add('show');
-      // Redirect to app after brief success flash
-      setTimeout(() => { window.location.href = '/app'; }, 1200);
-    } catch(e) {
-      console.error('Login callback error:', e);
-    }
-  }
-})();
-
-// Enter key support
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter') handleLogin();
-});
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#243d32">
+<title>Sign in — DripTrack</title>
+<meta name="description" content="Discover sourced product listings with clear prices, original titles and transparent data. DripTrack helps you shop better informed.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23243d32'/%3E%3Ctext x='10' y='44' font-size='36' font-family='Arial' font-weight='bold' fill='%23d9f474'%3Edt%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/site.css">
+<link rel="manifest" href="/manifest.json">
+<script defer src="/site.js">
 </script>
+</head>
+<body data-page="login">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<nav class="nav wrap" aria-label="Main navigation">
+<a class="brand" href="/" aria-label="DripTrack home">
+<span class="brandmark" aria-hidden="true">dt</span>driptrack</a>
+<div class="nav-links">
+<a href="/app" >Explore</a>
+<a class="watch-nav" aria-label="Watchlist" href="/watchlist.html" >Watchlist</a>
+<a class="nav-about" href="/about.html" >Our data</a>
+<a class="nav-button" id="account-link" href="/login.html">Sign in ↗</a>
+</div>
+</nav>
+</header>
+<main class="wrap" id="main">
+<section class="form-page">
+<div class="eyebrow">Welcome back</div>
+<h1 class="page-title">Your next find awaits.</h1>
+<p>Sign in to save listings and manage your alerts.</p>
+<form class="panel form-panel" id="login-form">
+<div class="field">
+<label for="email">Email address</label>
+<input id="email" name="email" type="email" required autocomplete="email">
+</div>
+<div class="field">
+<label for="password">Password</label>
+<input id="password" name="password" type="password" required autocomplete="current-password">
+</div>
+<button class="button" type="submit">Sign in →</button>
+<p id="form-message" class="form-message" role="status">
+</p>
+<button id="forgot-password" class="button ghost" type="button">Send a password reset email</button>
+</form>
+<div id="google-signin" hidden>
+<div class="auth-divider">or</div>
+<a class="button ghost" style="width:100%" href="/auth/google">Continue with Google</a>
+</div>
+<p class="fine">New here? <a class="text-link" href="/register.html">Create an account</a>
+</p>
+</section>
+</main>
+<footer class="site-footer">
+<div class="wrap">
+<div class="footer-top">
+<div>
+<a class="brand" href="/">
+<span class="brandmark" aria-hidden="true">dt</span>driptrack</a>
+<p class="fine">Good taste. Better informed.</p>
+</div>
+<div class="footer-links">
+<a href="/app">Explore</a>
+<a href="/about.html#sources">Data & methodology</a>
+<a href="/about.html#privacy">Privacy</a>
+<a href="/account.html">Your account</a>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 DripTrack</span>
+<span>Prices are source-reported snapshots. Confirm details with the seller.<br>DripTrack does not sell or authenticate products.</span>
+</div>
+</div>
+</footer>
+<div id="toast" class="toast" role="status" hidden>
+</div>
 </body>
 </html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#243d32">
+<title>How DripTrack works — DripTrack</title>
+<meta name="description" content="Discover sourced product listings with clear prices, original titles and transparent data. DripTrack helps you shop better informed.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23243d32'/%3E%3Ctext x='10' y='44' font-size='36' font-family='Arial' font-weight='bold' fill='%23d9f474'%3Edt%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/site.css">
+<link rel="manifest" href="/manifest.json">
+<script defer src="/site.js">
+</script>
+</head>
+<body data-page="about">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<nav class="nav wrap" aria-label="Main navigation">
+<a class="brand" href="/" aria-label="DripTrack home">
+<span class="brandmark" aria-hidden="true">dt</span>driptrack</a>
+<div class="nav-links">
+<a href="/app" >Explore</a>
+<a class="watch-nav" aria-label="Watchlist" href="/watchlist.html" >Watchlist</a>
+<a class="nav-about" href="/about.html" aria-current="page">Our data</a>
+<a class="nav-button" id="account-link" href="/login.html">Sign in ↗</a>
+</div>
+</nav>
+</header>
+<main class="wrap" id="main">
+<article class="prose">
+<div class="eyebrow">Our approach</div>
+<h1>Good information.<br>Honest boundaries.</h1>
+<p>DripTrack helps you discover listings for sneakers, watches, bags and streetwear. We don’t sell products, fulfill orders or independently authenticate items.</p>
+<h2 id="sources">Where the listings come from</h2>
+<p>Our server requests listing data from the eBay Browse API, Amazon search through Rainforest, and Google Shopping through SerpAPI. A configured key does not mean a provider is working. The status below reflects the latest request made by this running server.</p>
+<div id="source-status" class="source-list" role="status">Checking provider status…</div>
+<p>Google Shopping results are an index, not a direct inventory feed. A “Shopping result” link opens the provider’s product page; a “Seller listing” link opens the URL the provider supplied. We do not substitute a generic retailer search URL for a priced listing.</p>
+<h2>What a price means</h2>
+<p>Prices are reported in US dollars by the data provider. Search responses with results are cached for up to one hour. “Fetched” is when our server received the data, not a promise that the seller updated it then. The seller’s final price, availability, shipping and taxes may differ.</p>
+<p>We retain the source’s product title, image, condition and description when supplied. Missing images or descriptions are shown as unavailable. Different sizes, colorways, sellers and conditions are separate listings; the cheapest search result is not necessarily a comparable deal.</p>
+<h2>Authenticity is a seller question</h2>
+<p>DripTrack does not certify products or sellers. A brand name, seller feedback score or price is not proof of authenticity. Review the seller, condition, return policy and any marketplace authentication program before purchasing.</p>
+<h2>History without guesswork</h2>
+<p>We record a price observation when an uncached search returns that exact source listing. History is keyed to the listing, not a mixture of search results. We never generate estimated charts, fake movements or backfilled prices. Early listings may have just one observation.</p>
+<h2>Alerts and availability</h2>
+<p>Price alerts check the exact saved listing when this server is running, approximately every 30 minutes. A match is required before an alert can trigger. Checks can be delayed by provider outages, credit limits or hosting sleep. Email delivery is not guaranteed. Existing alerts without a listing ID need to be recreated from a current result.</p>
+<h2 id="privacy">Your account and data</h2>
+<p>Accounts store your name, email, password hash, saved listings and alert preferences in our database. Google sign-in also stores your Google account ID and optional avatar. Passwords are hashed. Your sign-in token is kept in your browser so you remain signed in; sign out on shared devices.</p>
+<p>Search terms are sent to the listing providers named above. Product images load from their original hosts. The site uses Google Fonts. Following an external listing takes you to a third party with its own privacy and purchase terms.</p>
+<p>You can remove saved listings and alerts, or delete your account from the account page. Deleting your account removes its profile, saved listings, alerts and push subscriptions; previously collected listing observations do not identify your account.</p>
+<h2>Questions or problems?</h2>
+<p>
+<a href="https://github.com/Jeet-Bharucha/DripTrack/issues" target="_blank" rel="noopener noreferrer">Report a problem on GitHub</a>. Please do not include passwords or private connection strings in a public report.</p>
+<h2>Use of the service</h2>
+<p>DripTrack is provided as a price discovery tool. Confirm all purchase details with the seller. Retailer names identify listing sources and do not imply partnership or endorsement. DripTrack does not collect payment for purchases or control third-party listings.</p>
+</article>
+</main>
+<footer class="site-footer">
+<div class="wrap">
+<div class="footer-top">
+<div>
+<a class="brand" href="/">
+<span class="brandmark" aria-hidden="true">dt</span>driptrack</a>
+<p class="fine">Good taste. Better informed.</p>
+</div>
+<div class="footer-links">
+<a href="/app">Explore</a>
+<a href="/about.html#sources">Data & methodology</a>
+<a href="/about.html#privacy">Privacy</a>
+<a href="/account.html">Your account</a>
+</div>
+</div>
+<div class="footer-bottom">
+<span>© 2026 DripTrack</span>
+<span>Prices are source-reported snapshots. Confirm details with the seller.<br>DripTrack does not sell or authenticate products.</span>
+</div>
+</div>
+</footer>
+<div id="toast" class="toast" role="status" hidden>
+</div>
+</body>
+</html>

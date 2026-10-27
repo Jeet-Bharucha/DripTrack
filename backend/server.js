@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const pricing = require('./pricing');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -17,6 +18,29 @@ const PUBLIC_URL = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL ||
 
 app.use(cors());
 app.use(express.json());
+app.use('/auth', (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) return res.status(503).json({ message: 'Account services are temporarily unavailable. Please try again later.' });
+  next();
+});
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.set('X-Frame-Options', 'DENY');
+  if (req.path.startsWith('/auth/')) res.set('Cache-Control', 'no-store');
+  next();
+});
+const requestWindows = new Map();
+app.use(['/auth', '/api/prices', '/api/listing'], (req, res, next) => {
+  const key = `${req.ip}:${req.baseUrl === '/auth' ? 'auth' : 'prices'}`;
+  const now = Date.now();
+  let window = requestWindows.get(key);
+  if (!window || now > window.until) { window = { count: 0, until: now + 600000 }; requestWindows.set(key, window); }
+  if (requestWindows.size > 5000) for (const [k,v] of requestWindows) if (v.until < now) requestWindows.delete(k);
+  if (++window.count > 60) return res.status(429).json({ message: 'Too many requests. Please try again in a few minutes.' });
+  next();
+});
 
 // ── ROUTES must come BEFORE express.static so they aren't overridden
 // Landing page at root
@@ -33,8 +57,10 @@ const publicFiles = new Set([
   'landing.html', 'index.html', 'login.html', 'register.html', 'resetpassword.html',
   'account.html', 'watchlist.html', 'product.html', '404.html', 'api-connector.js',
   'sw.js', 'manifest.json', 'Drip Track Logo.png', 'icon-192.png', 'icon-512.png',
+  'site.css', 'site.js', 'about.html',
 ]);
 app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   let file;
   try { file = decodeURIComponent(req.path).slice(1); } catch { return res.sendStatus(400); }
   if (!publicFiles.has(file)) return next();
@@ -189,6 +215,11 @@ function authMiddleware(req, res, next) {
 app.post('/auth/register', async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
 
+  if (![firstName, lastName, email, password].every(v => typeof v === 'string') ||
+      firstName.trim().length < 1 || lastName.trim().length < 1 || firstName.length > 60 || lastName.length > 60 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || password.length > 128 || /[<>]/.test(firstName + lastName))
+    return res.status(400).json({ message: 'Enter a valid name, email and password.' });
+
   if (!firstName || !lastName || !email || !password)
     return res.status(400).json({ message: 'All fields are required' });
   if (password.length < 8)
@@ -196,7 +227,7 @@ app.post('/auth/register', async (req, res) => {
 
   try {
     // Check if email already exists
-    const existing = await User.findOne({ email: email.toLowerCase() });
+    const existing = await User.findOne({ email: email.trim().toLowerCase() });
     if (existing)
       return res.status(400).json({ message: 'An account with this email already exists' });
 
@@ -210,7 +241,7 @@ app.post('/auth/register', async (req, res) => {
     const user = new User({
       firstName,
       lastName,
-      email: email.toLowerCase(),
+      email: email.trim().toLowerCase(),
       password: hashedPassword,
       verifyToken,
       verified: false,
@@ -218,7 +249,7 @@ app.post('/auth/register', async (req, res) => {
     await user.save();
 
     // Send verification email
-    const emailSent = await sendVerificationEmail(email, firstName, verifyToken);
+    const emailSent = await sendVerificationEmail(email, firstName, verifyToken).catch(() => false);
 
     console.log(`✅ New user registered: ${email}`);
     res.json({
@@ -238,17 +269,20 @@ app.post('/auth/register', async (req, res) => {
 app.post('/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
+  if (typeof email !== 'string' || typeof password !== 'string' || email.length > 254 || password.length > 128)
+    return res.status(400).json({ message: 'Enter your email and password.' });
+
   if (!email || !password)
     return res.status(400).json({ message: 'Email and password are required' });
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user)
-      return res.status(401).json({ message: 'No account found with this email' });
+      return res.status(401).json({ message: 'Email or password is incorrect' });
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    const passwordMatch = user.password && await bcrypt.compare(password, user.password);
     if (!passwordMatch)
-      return res.status(401).json({ message: 'Incorrect password' });
+      return res.status(401).json({ message: 'Email or password is incorrect' });
 
     // Generate JWT token — expires in 7 days
     const token = jwt.sign(
@@ -282,7 +316,8 @@ app.get('/auth/verify', async (req, res) => {
   const { token } = req.query;
   try {
     const { email } = jwt.verify(token, JWT_SECRET);
-    await User.findOneAndUpdate({ email }, { verified: true, verifyToken: null });
+    const user = await User.findOneAndUpdate({ email, verifyToken: token }, { verified: true, verifyToken: null });
+    if (!user) return res.redirect('/login.html?error=invalid_token');
     res.redirect('/login.html?verified=true');
   } catch {
     res.redirect('/login.html?error=invalid_token');
@@ -303,6 +338,7 @@ app.get('/auth/me', authMiddleware, async (req, res) => {
 // FORGOT PASSWORD
 app.post('/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
+  if (typeof email !== 'string' || email.length > 254) return res.status(400).json({ message: 'Enter a valid email address.' });
   if (!email) return res.status(400).json({ message: 'Email is required' });
 
   console.log(`\n🔑 Password reset requested for: ${email}`);
@@ -315,7 +351,7 @@ app.post('/auth/forgot-password', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user) {
       console.log(`⚠️  No account found for: ${email}`);
       return res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
@@ -346,6 +382,8 @@ app.post('/auth/forgot-password', async (req, res) => {
 // RESET PASSWORD
 app.post('/auth/reset-password', async (req, res) => {
   const { token, newPassword } = req.body;
+  if (typeof token !== 'string' || typeof newPassword !== 'string' || newPassword.length > 128)
+    return res.status(400).json({ message: 'Enter a valid reset token and password.' });
   if (!token || !newPassword)
     return res.status(400).json({ message: 'Token and new password are required' });
   if (newPassword.length < 8)
@@ -377,16 +415,17 @@ app.post('/auth/reset-password', async (req, res) => {
 // Use env var in production, fallback to localhost for dev
 function getGoogleRedirectUri(req) {
   if (process.env.GOOGLE_REDIRECT_URI) return process.env.GOOGLE_REDIRECT_URI;
-  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  const host  = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`;
-  return `${proto}://${host}/auth/google/callback`;
+  return `${PUBLIC_URL}/auth/google/callback`;
 }
 
 app.get('/auth/google', (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     return res.redirect('/login.html?error=google_not_configured');
   }
+  const state = require('crypto').randomBytes(32).toString('hex');
+  res.cookie('oauth_state', state, { httpOnly: true, secure: PUBLIC_URL.startsWith('https:'), sameSite: 'lax', maxAge: 600000, path: '/auth/google' });
   const params = new URLSearchParams({
+    state,
     client_id:     process.env.GOOGLE_CLIENT_ID,
     redirect_uri:  getGoogleRedirectUri(req),
     response_type: 'code',
@@ -400,6 +439,9 @@ app.get('/auth/google', (req, res) => {
 app.get('/auth/google/callback', async (req, res) => {
   const { code, error } = req.query;
   if (error || !code) return res.redirect('/login.html?error=google_cancelled');
+  const cookieState = (req.headers.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith('oauth_state='))?.slice('oauth_state='.length);
+  res.clearCookie('oauth_state', { path: '/auth/google' });
+  if (!cookieState || cookieState !== req.query.state) return res.redirect('/login.html?error=google_state');
 
   try {
     // 1. Exchange code → access token
@@ -416,11 +458,11 @@ app.get('/auth/google/callback', async (req, res) => {
     const profileRes = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${access_token}` },
     });
-    const { sub: googleId, email, given_name, family_name, picture } = profileRes.data;
-    if (!email) return res.redirect('/login.html?error=google_no_email');
+    const { sub: googleId, email, given_name, family_name, picture, email_verified } = profileRes.data;
+    if (!email || !email_verified) return res.redirect('/login.html?error=google_no_email');
 
     // 3. Find existing user by googleId OR email
-    let user = await User.findOne({ $or: [{ googleId }, { email: email.toLowerCase() }] });
+    let user = await User.findOne({ $or: [{ googleId }, { email: email.trim().toLowerCase() }] });
 
     if (!user) {
       // Brand new user — create account (Google already verified the email)
@@ -428,7 +470,7 @@ app.get('/auth/google/callback', async (req, res) => {
       user = new User({
         firstName: given_name  || 'Google',
         lastName:  family_name || 'User',
-        email:     email.toLowerCase(),
+        email:     email.trim().toLowerCase(),
         password:  await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
         googleId,
         avatar:    picture || '',
@@ -463,7 +505,7 @@ app.get('/auth/google/callback', async (req, res) => {
     }));
 
     // 5. Redirect to frontend — login.html reads ?token= and ?user= from URL
-    res.redirect(`/login.html?token=${token}&user=${userData}`);
+    res.redirect(`/login.html#token=${encodeURIComponent(token)}`);
 
   } catch (err) {
     console.error('Google OAuth error:', err.response?.data || err.message);
@@ -474,9 +516,22 @@ app.get('/auth/google/callback', async (req, res) => {
 // WATCHLIST — add product
 app.post('/auth/watchlist', authMiddleware, async (req, res) => {
   const { product } = req.body;
-  if (!product) return res.status(400).json({ message: 'Product is required' });
+  if (typeof product !== 'string' || product.length > 10000) return res.status(400).json({ message: 'A valid listing is required' });
+  let listing;
+  try { listing = JSON.parse(product); } catch { return res.status(400).json({ message: 'A valid listing is required' }); }
+  if (!/^[a-f0-9]{24}$/.test(listing.id) || typeof listing.title !== 'string') return res.status(400).json({ message: 'Save a current source listing.' });
   try {
-    await User.findByIdAndUpdate(req.user.userId, { $addToSet: { watchlist: product } });
+    if (typeof listing.searchQuery !== 'string' || listing.searchQuery.length < 2 || listing.searchQuery.length > 120)
+      return res.status(400).json({ message: 'This listing is missing its original search.' });
+    const data = await pricing.search(listing.searchQuery);
+    const sourceListing = data.results.find(r => r.id === listing.id);
+    if (!sourceListing) return res.status(400).json({ message: 'This exact listing could not be confirmed. Search again before saving.' });
+    const savedProduct = JSON.stringify({ ...sourceListing, searchQuery: listing.searchQuery });
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: 'Account not found.' });
+    if (user.watchlist.length >= 100) return res.status(400).json({ message: 'Your shortlist can hold up to 100 listings.' });
+    if (!user.watchlist.some(raw => { try { return JSON.parse(raw).id === listing.id; } catch { return false; } })) user.watchlist.push(savedProduct);
+    await user.save();
     res.json({ success: true, message: 'Added to watchlist' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -514,68 +569,12 @@ app.delete('/auth/watchlist/:index', authMiddleware, async (req, res) => {
 app.delete('/auth/account', authMiddleware, async (req, res) => {
   try {
     await User.findByIdAndDelete(req.user.userId);
+    await PushSubscription.deleteMany({ userId: req.user.userId });
     res.json({ success: true, message: 'Account deleted' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
 });
-
-// ─────────────────────────────────────────────
-// SEARCH RESULTS CACHE — saves API credits
-// Results cached for 1 hour in MongoDB + in-memory fallback
-// ─────────────────────────────────────────────
-const searchCacheSchema = new mongoose.Schema({
-  query:     { type: String, required: true, unique: true, index: true },
-  results:   { type: mongoose.Schema.Types.Mixed },
-  bestPrice: { type: mongoose.Schema.Types.Mixed },
-  cachedAt:  { type: Date, default: Date.now },
-});
-const SearchCache = mongoose.model('SearchCache', searchCacheSchema);
-
-// In-memory cache (key = normalized query, value = { results, bestPrice, cachedAt })
-const memSearchCache = {};
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-function normalizeQuery(q) { return q.toLowerCase().trim().replace(/\s+/g, ' '); }
-
-async function getCachedSearch(query) {
-  const key = normalizeQuery(query);
-  // Check in-memory first (fastest)
-  if (memSearchCache[key] && Date.now() - memSearchCache[key].cachedAt < CACHE_TTL_MS) {
-    console.log(`  💾 Cache HIT (memory): "${query}"`);
-    return memSearchCache[key];
-  }
-  // Check MongoDB
-  try {
-    if (mongoose.connection.readyState === 1) {
-      const doc = await SearchCache.findOne({ query: key });
-      if (doc && Date.now() - doc.cachedAt.getTime() < CACHE_TTL_MS) {
-        console.log(`  💾 Cache HIT (DB): "${query}"`);
-        const cached = { results: doc.results, bestPrice: doc.bestPrice, cachedAt: doc.cachedAt.getTime() };
-        memSearchCache[key] = cached; // warm the memory cache
-        return cached;
-      }
-    }
-  } catch (e) { /* ignore cache errors */ }
-  return null;
-}
-
-async function setCachedSearch(query, results, bestPrice) {
-  const key = normalizeQuery(query);
-  const now = Date.now();
-  // Store in memory
-  memSearchCache[key] = { results, bestPrice, cachedAt: now };
-  // Store in MongoDB (upsert)
-  try {
-    if (mongoose.connection.readyState === 1) {
-      await SearchCache.findOneAndUpdate(
-        { query: key },
-        { results, bestPrice, cachedAt: new Date(now) },
-        { upsert: true, new: true }
-      );
-    }
-  } catch (e) { /* ignore cache write errors */ }
-}
 
 // ─────────────────────────────────────────────
 // PRICE HISTORY — persisted in MongoDB
@@ -592,6 +591,7 @@ const PriceHistory = mongoose.model('PriceHistory', priceHistorySchema);
 const priceHistoryCache = {};
 
 async function savePriceHistory(id, price, source) {
+  if (Object.keys(priceHistoryCache).length > 1500 && !priceHistoryCache[id]) delete priceHistoryCache[Object.keys(priceHistoryCache)[0]];
   // Always save to in-memory cache
   if (!priceHistoryCache[id]) priceHistoryCache[id] = [];
   priceHistoryCache[id].push({ price, source, timestamp: Date.now() });
@@ -612,385 +612,22 @@ async function savePriceHistory(id, price, source) {
 }
 
 // ─────────────────────────────────────────────
-// TRUSTED RETAILERS
-// ─────────────────────────────────────────────
-const TRUSTED_RETAILERS = [
-  'nike', 'adidas', 'stockx', 'goat', 'foot locker', 'footlocker',
-  'zappos', 'nordstrom', 'ray-ban', 'oakley', 'finish line',
-  'jd sports', 'hibbett', 'champs sports', 'new balance',
-  'amazon', 'ebay', 'walmart', 'dick\'s sporting goods',
-  'sunglass hut', 'louis vuitton', 'gucci', 'prada',
-  'chrono24', 'watchbox',
-];
-function isTrustedRetailer(source) {
-  if (!source) return false;
-  const s = source.toLowerCase();
-  return TRUSTED_RETAILERS.some(r => s.includes(r));
-}
-
-const JUNK_KEYWORDS = [
-  // Hardware / parts / repairs
-  'wire','cable','battery','charger','extension','spring','clasp','buckle',
-  'strap','band','lace','laces','insole','sole','repair','replacement part',
-  'spare part','service kit','tool','hinge','screw','link','bracelet link',
-  'crystal','bezel insert','crown','stem','pushers','gasket','seal',
-  // Accessories / small items
-  'sticker','decal','patch','pin','badge','keychain','charm','lanyard',
-  'dust bag only','case only','box only','empty box','authentication card only',
-  'tag only','hang tag',
-  // Bulk / lot / novelty
-  'party favor','cake topper','lot of','pack of','set of',
-  '6 pc','8 pc','10 pc','12 pc','24 pc',
-  // Fakes / non-product
-  'replica','inspired by','lego','toy','poster','photo','print','pawn',
-  'for older model','for models','clasp repair','push button','end link',
-  'rubber strap','leather strap','nylon strap','nato strap',
-  // Clothing parts / non-product
-  'iron on','heat transfer','embroidery','sewing','fabric',
-];
-function isJunkListing(title) {
-  if (!title) return false;
-  const t = title.toLowerCase();
-  return JUNK_KEYWORDS.some(k => t.includes(k));
-}
-function isKidsProduct(title) {
-  if (!title) return false;
-  const t = title.toLowerCase();
-  return t.includes('kids')||t.includes('grade school')||t.includes('(gs)')||
-    t.includes('preschool')||t.includes('toddler')||t.includes('infant')||
-    t.includes('big kids')||t.includes('little kids')||t.includes('youth');
-}
-
-// Check that the listing title is actually relevant to the search term
-// At least 1 significant word from the search must appear in the title
-function isRelevantListing(title, searchTerm) {
-  if (!title || !searchTerm) return true; // give benefit of doubt if no info
-  const titleL = title.toLowerCase();
-  const searchL = searchTerm.toLowerCase();
-  // Split search into meaningful words (3+ chars, skip common words)
-  const stopWords = new Set(['the','and','for','with','from','this','that','are','was','its','has','not','but','can','all','any','new']);
-  const searchWords = searchL.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
-  if (!searchWords.length) return true;
-  // At least 1 search word must appear in the title
-  return searchWords.some(w => titleL.includes(w));
-}
-
-function getMinPrice(s) {
-  s = (s||'').toLowerCase();
-  if (s.includes('rolex')||s.includes('audemars')||s.includes('patek')) return 1000;
-  if (s.includes('louis vuitton')||s.includes('hermes')||s.includes('chanel')) return 300;
-  if (s.includes('gucci')||s.includes('prada')||s.includes('balenciaga')) return 150;
-  if (s.includes('supreme')||s.includes('off-white')) return 60;
-  if (s.includes('yeezy')||s.includes('jordan')||s.includes('dunk')) return 50;
-  if (s.includes('ray-ban')||s.includes('oakley')) return 40;
-  if (s.includes('nike')||s.includes('adidas')||s.includes('new balance')) return 40;
-  return 15;
-}
-function isValidListing(result, searchTerm) {
-  if (!result||!result.price) return false;
-  if (result.price < getMinPrice(searchTerm)) return false;
-  if (isJunkListing(result.title)) return false;
-  if (isKidsProduct(result.title)) return false;
-  if (!isRelevantListing(result.title, searchTerm)) return false;
-  return true;
-}
-function deduplicateBySource(results) {
-  const seen = {};
-  const out  = [];
-  let ebayCount = 0;
-  for (const r of results) {
-    const key = (r.source||'unknown').toLowerCase();
-    // Allow up to 3 eBay results (different products/sellers), 1 per every other source
-    if (key === 'ebay') {
-      if (ebayCount < 3) { out.push(r); ebayCount++; }
-    } else {
-      if (!seen[key] || r.price < seen[key].price) { seen[key] = r; }
-    }
-  }
-  return [...Object.values(seen), ...out];
-}
-function authenticityCheck(prices) {
-  const validPrices = prices.filter(p=>p&&p.price>0).map(p=>p.price);
-  if (validPrices.length<2) return prices;
-  const avg = validPrices.reduce((a,b)=>a+b,0)/validPrices.length;
-  const threshold = avg * 0.45;
-  return prices.map(p => p ? {
-    ...p,
-    suspicious: p.price < threshold,
-    authenticityNote: p.price < threshold ? '⚠️ Price unusually low' : '✓ Price within normal market range',
-  } : p);
-}
-
-// URL builders
-const URL_BUILDERS = {
-  'nike': t=>`https://www.nike.com/search/results/?q=${encodeURIComponent(t)}`,
-  'goat': t=>`https://www.goat.com/search?query=${encodeURIComponent(t)}`,
-  'stockx': t=>`https://stockx.com/search?s=${encodeURIComponent(t)}`,
-  'foot locker': t=>`https://www.footlocker.com/search?query=${encodeURIComponent(t)}`,
-  'footlocker': t=>`https://www.footlocker.com/search?query=${encodeURIComponent(t)}`,
-  'zappos': t=>`https://www.zappos.com/search/term/${encodeURIComponent(t)}`,
-  'nordstrom': t=>`https://www.nordstrom.com/sr?origin=keywordsearch&keyword=${encodeURIComponent(t)}`,
-  'adidas': t=>`https://www.adidas.com/us/search?q=${encodeURIComponent(t)}`,
-  'ray-ban': t=>`https://www.ray-ban.com/usa/search/${encodeURIComponent(t)}`,
-  'oakley': t=>`https://www.oakley.com/en-us/search#q=${encodeURIComponent(t)}`,
-  'amazon': t=>`https://www.amazon.com/s?k=${encodeURIComponent(t)}`,
-  'ebay': t=>`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(t)}`,
-  'finish line': t=>`https://www.finishline.com/store/search?query=${encodeURIComponent(t)}`,
-  'jd sports': t=>`https://www.jdsports.com/search/?q=${encodeURIComponent(t)}`,
-  'new balance': t=>`https://www.newbalance.com/search?q=${encodeURIComponent(t)}`,
-  'chrono24': t=>`https://www.chrono24.com/search/index.htm?query=${encodeURIComponent(t)}`,
-};
-function buildFallbackUrl(source, title) {
-  if (!source) return null;
-  const key = source.toLowerCase();
-  for (const [retailer, builder] of Object.entries(URL_BUILDERS)) {
-    if (key.includes(retailer)) return builder(title||'');
-  }
-  return null;
-}
-function getBestUrl(serpLink, source, title, searchTerm) {
-  if (serpLink&&serpLink.startsWith('http')&&!serpLink.includes('google.com/search')) return serpLink;
-  return buildFallbackUrl(source, title||searchTerm);
-}
-
-// AMAZON
-async function getAmazonPrice(searchTerm) {
-  if (!process.env.RAINFOREST_API_KEY) return null;
-  try {
-    const res = await axios.get('https://api.rainforestapi.com/request', {
-      params: { api_key: process.env.RAINFOREST_API_KEY, type: 'search', amazon_domain: 'amazon.com', search_term: searchTerm, sort_by: 'featured' },
-      timeout: 8000,
-    });
-    const results = (res.data.search_results||[]).filter(r=>isValidListing({price:r.price?.value,title:r.title},searchTerm));
-    const item = results.find(r=>r.is_prime||r.fulfillment?.type==='AMAZON')||results[0];
-    if (!item) return null;
-    const url = item.asin ? `https://www.amazon.com/dp/${item.asin}` : `https://www.amazon.com/s?k=${encodeURIComponent(searchTerm)}`;
-    return { source:'Amazon', price:item.price?.value||null, currency:'USD', url, title:item.title, image:item.image, verified:true };
-  } catch (err) {
-    console.error('  ❌ Amazon/Rainforest error:', err.response?.status, err.response?.data?.message || err.message);
-    return null;
-  }
-}
-
-// EBAY
-async function getEbayPrice(searchTerm) {
-  if (!process.env.EBAY_CLIENT_ID||!process.env.EBAY_CLIENT_SECRET) return null;
-  try {
-    const tokenRes = await axios.post('https://api.ebay.com/identity/v1/oauth2/token',
-      'grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope',
-      { headers:{'Content-Type':'application/x-www-form-urlencoded'}, auth:{username:process.env.EBAY_CLIENT_ID,password:process.env.EBAY_CLIENT_SECRET} }
-    );
-    // Fetch more results so filtering has enough to work with
-    const res = await axios.get('https://api.ebay.com/buy/browse/v1/item_summary/search', {
-      headers:{Authorization:`Bearer ${tokenRes.data.access_token}`},
-      params:{
-        q: searchTerm,
-        filter: 'conditionIds:{1000|1500|2000|2500}', // new, like new, very good, good
-        sort: 'price',
-        limit: 20,
-      },
-      timeout:8000,
-    });
-    const items = (res.data.itemSummaries||[])
-      .filter(i => isValidListing({ price: parseFloat(i.price?.value), title: i.title }, searchTerm))
-      .filter(i => (i.seller?.feedbackScore||0) > 50)
-      // Extra: title must contain at least one word from searchTerm (already in isValidListing, belt+suspenders)
-      .filter(i => isRelevantListing(i.title, searchTerm));
-
-    if (!items[0]) return null;
-
-    // Return top 3 relevant eBay results instead of just 1
-    const topItems = items.slice(0, 3);
-    const best = topItems[0];
-    return {
-      source: 'eBay',
-      price: parseFloat(best.price?.value)||null,
-      currency: 'USD',
-      url: best.itemWebUrl || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(searchTerm)}`,
-      title: best.title,
-      image: best.image?.imageUrl,
-      verified: (best.seller?.feedbackScore||0) > 100,
-      // Extra results for display
-      extraResults: topItems.slice(1).map(i => ({
-        source: 'eBay',
-        price: parseFloat(i.price?.value)||null,
-        currency: 'USD',
-        url: i.itemWebUrl,
-        title: i.title,
-        image: i.image?.imageUrl,
-        verified: (i.seller?.feedbackScore||0) > 100,
-      })),
-    };
-  } catch (err) {
-    console.error('  ❌ eBay error:', err.response?.status, err.response?.data?.errors?.[0]?.message || err.message);
-    return null;
-  }
-}
-
-// SERPAPI
-async function getGoogleShoppingPrices(searchTerm) {
-  if (!process.env.SERPAPI_KEY) return [];
-  try {
-    const res = await axios.get('https://serpapi.com/search', {
-      params: { engine:'google_shopping', q:searchTerm, api_key:process.env.SERPAPI_KEY, num:20 },
-      timeout: 10000,
-    });
-
-    // Detect credit exhaustion or API-level errors in the body
-    if (res.data.error) {
-      console.error('  ❌ SerpAPI API error:', res.data.error);
-      if (/credit|plan|limit|quota|usage/i.test(res.data.error)) {
-        console.error('  ⚠️  SerpAPI credits exhausted — upgrade at serpapi.com or wait for monthly reset');
-      }
-      return [];
-    }
-
-    const raw     = res.data.shopping_results || [];
-    const trusted = raw.filter(r => isTrustedRetailer(r.source));
-    // Use trusted sources first; fall back to all results if no trusted found
-    const pool = trusted.length ? trusted : raw;
-    const clean = pool.filter(r => isValidListing({ price:r.extracted_price, title:r.title }, searchTerm));
-    clean.sort((a, b) => (a.extracted_price||0) - (b.extracted_price||0));
-    const mapped = clean.slice(0, 8).map(r => ({
-      source:   r.source || 'Unknown',
-      price:    r.extracted_price || null,
-      currency: 'USD',
-      url:      getBestUrl(r.link, r.source, r.title, searchTerm),
-      title:    r.title || '',
-      image:    r.thumbnail || null,
-      verified: isTrustedRetailer(r.source),
-    })).filter(r => r.price);
-    console.log(`  🔍 SerpAPI raw: ${raw.length} total, ${trusted.length} trusted, ${clean.length} after filter → ${mapped.length} returned`);
-    return mapped;
-  } catch (err) {
-    const status = err.response?.status;
-    const msg    = err.response?.data?.error || err.message;
-    console.error(`  ❌ SerpAPI error [HTTP ${status||'?'}]:`, msg);
-    if (status === 429) console.error('  ⚠️  SerpAPI rate limited — too many requests');
-    if (status === 401) console.error('  ⚠️  SerpAPI invalid API key — check SERPAPI_KEY in .env');
-    return [];
-  }
-}
-
-// ─────────────────────────────────────────────
-// FALLBACK RETAILER LINKS
-// When APIs return nothing, generate search links for major retailers
-// so users always have somewhere to shop
-// ─────────────────────────────────────────────
-function getSneakerRetailers(query) {
-  const q = query.toLowerCase();
-  const isSneaker  = /nike|jordan|yeezy|dunk|adidas|new balance|puma|asics|converse|vans/i.test(q) || !/(watch|handbag|bag|gucci|rolex|omega|prada|chanel|lv |louis)/i.test(q);
-  const isWatch    = /watch|rolex|omega|seiko|casio|tissot|longines|tag heuer|patek/i.test(q);
-  const isLuxury   = /gucci|prada|chanel|louis vuitton|hermes|burberry|versace/i.test(q);
-
-  if (isWatch) {
-    return [
-      { source: 'Chrono24',    url: `https://www.chrono24.com/search/index.htm?query=${encodeURIComponent(query)}`, price: null, browse: true },
-      { source: 'WatchBox',    url: `https://www.watchbox.com/collections/all?q=${encodeURIComponent(query)}`,    price: null, browse: true },
-      { source: 'eBay Watches',url: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&_sacat=31387`, price: null, browse: true },
-    ];
-  }
-  if (isLuxury) {
-    return [
-      { source: 'Farfetch',    url: `https://www.farfetch.com/shopping/men/search/items.aspx?q=${encodeURIComponent(query)}`, price: null, browse: true },
-      { source: 'Vestiaire',   url: `https://www.vestiairecollective.com/search/?q=${encodeURIComponent(query)}`, price: null, browse: true },
-      { source: 'The RealReal',url: `https://www.therealreal.com/search?q=${encodeURIComponent(query)}`,          price: null, browse: true },
-    ];
-  }
-  // Default: sneakers / streetwear
-  return [
-    { source: 'StockX',     url: `https://stockx.com/search?s=${encodeURIComponent(query)}`,                          price: null, browse: true },
-    { source: 'GOAT',       url: `https://www.goat.com/search?query=${encodeURIComponent(query)}`,                    price: null, browse: true },
-    { source: 'Nike',       url: `https://www.nike.com/search/results/?q=${encodeURIComponent(query)}`,               price: null, browse: true },
-    { source: 'Foot Locker',url: `https://www.footlocker.com/search?query=${encodeURIComponent(query)}`,              price: null, browse: true },
-    { source: 'Finish Line',url: `https://www.finishline.com/store/search?query=${encodeURIComponent(query)}`,        price: null, browse: true },
-    { source: 'Adidas',     url: `https://www.adidas.com/us/search?q=${encodeURIComponent(query)}`,                   price: null, browse: true },
-    { source: 'Zappos',     url: `https://www.zappos.com/search/term/${encodeURIComponent(query)}`,                   price: null, browse: true },
-    { source: 'JD Sports',  url: `https://www.jdsports.com/search/?q=${encodeURIComponent(query)}`,                   price: null, browse: true },
-  ];
-}
-
-// ─────────────────────────────────────────────
 // PRICE ROUTES
 // ─────────────────────────────────────────────
 app.get('/api/prices', async (req, res) => {
-  const { q, nocache } = req.query;
-  if (!q) return res.status(400).json({ error: 'Missing ?q=' });
-  console.log(`\n🔍 Searching: "${q}"`);
-
-  // ── Check cache first (skip with ?nocache=1 for debugging)
-  if (!nocache) {
-    const cached = await getCachedSearch(q);
-    if (cached) {
-      const ageMin = Math.round((Date.now() - cached.cachedAt) / 60000);
-      console.log(`✅ ${cached.results.length} results (from cache, ${ageMin}m old)`);
-      return res.json({
-        query: q,
-        timestamp: new Date().toISOString(),
-        results: cached.results,
-        bestPrice: cached.bestPrice || null,
-        totalSources: cached.results.length,
-        cached: true,
-        cacheAge: ageMin,
-      });
-    }
-  }
-
-  // ── Live API calls
-  const [amazon, ebay, googleResults] = await Promise.all([
-    getAmazonPrice(q),
-    getEbayPrice(q),
-    getGoogleShoppingPrices(q),
-  ]);
-
-  // Debug — show what each API returned
-  console.log(`  📦 Amazon:  ${amazon ? `$${amazon.price} via ${amazon.source}` : '❌ no result'}`);
-  console.log(`  🛍️  eBay:    ${ebay ? `$${ebay.price} + ${(ebay.extraResults||[]).length} extras` : '❌ no result'}`);
-  console.log(`  🔍 SerpAPI: ${googleResults.length} results — ${googleResults.map(r=>`${r.source}($${r.price})`).join(', ') || 'none'}`);
-
-  // Flatten eBay extra results (top-3 eBay listings instead of just best)
-  const ebayExtras = ebay?.extraResults || [];
-  const ebayMain   = ebay ? { ...ebay, extraResults: undefined } : null;
-
-  const combined = [amazon, ebayMain, ...ebayExtras, ...googleResults].filter(Boolean);
-  const deduped  = deduplicateBySource(combined);
-  const checked  = authenticityCheck(deduped);
-
-  // ── If we got very few real results (only eBay or nothing), add browse links
-  // so users always see relevant retailers — marked as browse: true (no price shown)
-  const realResults = checked.filter(r => r.price);
-  const nonEbayReal = realResults.filter(r => r.source !== 'eBay');
-  if (nonEbayReal.length === 0) {
-    const browseLinks = getSneakerRetailers(q);
-    console.log(`  🔗 Added ${browseLinks.length} fallback browse links (APIs returned no non-eBay results)`);
-    checked.push(...browseLinks);
-  }
-
-  // Find best quality image: Amazon > eBay > SerpAPI (in that order)
-  const bestImage = amazon?.image || ebay?.image || googleResults.find(r => r?.image)?.image || null;
-
-  // Apply best image to real-price results that lack one (not browse links)
-  const enriched = checked.map(r => ({
-    ...r,
-    image: r.browse ? null : ((r.image && r.image.startsWith('http')) ? r.image : bestImage),
-  }));
-
-  const lowestPrice = enriched.filter(p=>!p.suspicious&&p.price).sort((a,b)=>a.price-b.price)[0];
-  if (lowestPrice) savePriceHistory(q.toLowerCase().replace(/\s+/g,'-'), lowestPrice.price, lowestPrice.source);
-
-  // ── Save to cache (only if we got results)
-  if (enriched.length > 0) {
-    await setCachedSearch(q, enriched, lowestPrice || null);
-  }
-
-  console.log(`✅ ${enriched.length} results (fresh from APIs)`);
-  res.json({ query:q, timestamp:new Date().toISOString(), results:enriched, bestPrice:lowestPrice||null, totalSources:enriched.length });
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (q.length < 2 || q.length > 120) return res.status(400).json({ message: 'Enter a search between 2 and 120 characters.' });
+  try {
+    const data = await pricing.search(q);
+    // Store observations for the exact source listing, never a blended search-query minimum.
+    if (!data.cached) await Promise.all(data.results.map(r => savePriceHistory(`listing-v2-${r.id}`, r.price, r.source)));
+    res.json(data);
+  } catch { res.status(503).json({ message: 'Price search is temporarily unavailable. Please try again.' }); }
 });
-
 app.get('/api/history', async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.status(400).json({ error: 'Missing ?q=' });
-  const id = q.toLowerCase().replace(/\s+/g, '-');
+  const listing = typeof req.query.listing === 'string' ? req.query.listing : '';
+  if (!/^[a-f0-9]{24}$/.test(listing)) return res.status(400).json({ message: 'An exact listing ID is required for price history.' });
+  const id = `listing-v2-${listing}`;
   try {
     if (mongoose.connection.readyState === 1) {
       const history = await PriceHistory.find({ productId: id }).sort({ timestamp: 1 }).limit(90);
@@ -1001,107 +638,40 @@ app.get('/api/history', async (req, res) => {
   res.json({ productId: id, history: fallback, dataPoints: fallback.length });
 });
 
+app.get('/api/listing', async (req, res) => {
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const id = typeof req.query.id === 'string' ? req.query.id : '';
+  if (q.length < 2 || q.length > 120 || !/^[a-f0-9]{24}$/.test(id)) return res.status(400).json({ message: 'A search and exact listing ID are required.' });
+  try {
+    const item = await pricing.listing(q, id);
+    if (!item) return res.status(404).json({ message: 'This exact listing is no longer in the source results.' });
+    res.json({ item });
+  } catch { res.status(503).json({ message: 'Listing details are temporarily unavailable.' }); }
+});
+
 app.get('/api/status', (req, res) => {
-  res.json({ status:'running', apis:{
-    rainforest: process.env.RAINFOREST_API_KEY ? '✅ Connected' : '❌ Missing key',
-    ebay: process.env.EBAY_CLIENT_ID ? '✅ Connected' : '❌ Missing key',
-    serpapi: process.env.SERPAPI_KEY ? '✅ Connected' : '❌ Missing key',
+  res.json({ status:'running', providers:pricing.providerStatus(), googleLogin:!!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET), apis:{
     mongodb: mongoose.connection.readyState === 1 ? '✅ Connected' : '❌ Not connected',
-    email: process.env.GMAIL_USER ? '✅ Configured' : '⚠️ Not configured',
-    cache: `${Object.keys(memSearchCache).length} queries in memory cache`,
+    email: process.env.GMAIL_USER && process.env.GMAIL_PASS ? 'Configured' : 'Not configured',
   }});
 });
 
-// Cache management — see what's cached or clear it
-app.get('/api/cache', async (req, res) => {
-  const keys = Object.keys(memSearchCache).map(k => ({
-    query: k,
-    results: memSearchCache[k].results?.length || 0,
-    ageMin: Math.round((Date.now() - memSearchCache[k].cachedAt) / 60000),
-    sources: [...new Set((memSearchCache[k].results||[]).map(r=>r.source))].join(', '),
-  }));
-  res.json({ cached: keys, total: keys.length, ttlHours: 1 });
-});
-
-app.delete('/api/cache', async (req, res) => {
-  const count = Object.keys(memSearchCache).length;
-  for (const k of Object.keys(memSearchCache)) delete memSearchCache[k];
-  try {
-    if (mongoose.connection.readyState === 1) await SearchCache.deleteMany({});
-  } catch (e) {}
-  console.log(`🗑️  Cache cleared (${count} entries)`);
-  res.json({ cleared: count });
-});
-
-app.get('/api/image', async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.status(400).json({ error: 'Missing ?q=' });
-  try {
-    if (process.env.SERPAPI_KEY) {
-      // Use google_images engine for full-size images instead of tiny shopping thumbnails
-      const r = await axios.get('https://serpapi.com/search', {
-        params: { engine: 'google_images', q, api_key: process.env.SERPAPI_KEY, num: 5 },
-        timeout: 6000,
-      });
-      const item = (r.data.images_results || []).find(x =>
-        x.original && !isJunkListing(x.title) && !isKidsProduct(x.title)
-      );
-      if (item?.original) return res.json({ image: item.original });
-      // Fallback to thumbnail if original not available
-      if (item?.thumbnail) return res.json({ image: item.thumbnail });
-    }
-    res.json({ image: null });
-  } catch { res.json({ image: null }); }
-});
-
-app.get('/api/angles', async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.status(400).json({ error: 'Missing ?q=' });
-  const angles = [];
-  try {
-    if (process.env.SERPAPI_KEY) {
-      // Only fetch Side, Back, Detail — Front is always the card's own image (handled client-side)
-      const angleQueries = [
-        { label: 'Side',   query: `${q} side view` },
-        { label: 'Back',   query: `${q} back view` },
-        { label: 'Detail', query: `${q} detail shot` },
-      ];
-      const results = await Promise.all(angleQueries.map(({ query }) =>
-        axios.get('https://serpapi.com/search', {
-          params: { engine: 'google_images', q: query, api_key: process.env.SERPAPI_KEY, num: 5 },
-          timeout: 6000,
-        }).catch(() => null)
-      ));
-      results.forEach((r, i) => {
-        if (!r) return;
-        const items = r.data.images_results || [];
-        // Prefer original full-size image, fall back to thumbnail
-        const item = items.find(x => (x.original || x.thumbnail) && !isJunkListing(x.title));
-        const url = item?.original || item?.thumbnail;
-        if (url) angles.push({ url, label: angleQueries[i].label });
-      });
-    }
-    res.json({ query: q, angles, total: angles.length });
-  } catch { res.json({ query: q, angles: [], total: 0 }); }
-});
-
-// ─────────────────────────────────────────────
 // PRICE DROP ALERT CHECKER
 // Runs every 30 minutes, checks all users' watchlists
 // ─────────────────────────────────────────────
 async function checkPriceAlerts() {
   if (mongoose.connection.readyState !== 1) return;
   try {
-    const users = await User.find({ 'watchlist.0': { $exists: true } });
+    const users = await User.find({ priceAlerts: { $exists: true, $ne: {} } });
     console.log(`\n🔔 Checking price alerts for ${users.length} users...`);
     for (const user of users) {
       if (!user.priceAlerts || !Object.keys(user.priceAlerts).length) continue;
       for (const [index, alertData] of Object.entries(user.priceAlerts)) {
-        if (!alertData.enabled || !alertData.targetPrice || !alertData.productName) continue;
+        if (!alertData.enabled || !alertData.targetPrice || !alertData.productName || !alertData.listingId || !alertData.searchQuery) continue;
+        if (alertData.lastNotifiedAt && Date.now() - new Date(alertData.lastNotifiedAt).getTime() < 86400000) continue;
         try {
-          const res = await axios.get(`http://localhost:${PORT}/api/prices?q=${encodeURIComponent(alertData.productName)}`, { timeout: 15000 });
-          const results = res.data.results || [];
-          const best = results.filter(r => r && r.price && !r.suspicious).sort((a, b) => a.price - b.price)[0];
+          const data = await pricing.search(alertData.searchQuery);
+          const best = data.results.find(r => r.id === alertData.listingId);
           if (!best) continue;
           if (best.price <= alertData.targetPrice) {
             console.log(`📉 Price drop! ${alertData.productName} now $${best.price} (target: $${alertData.targetPrice}) — alerting ${user.email}`);
@@ -1113,6 +683,9 @@ async function checkPriceAlerts() {
               url: best.url || '/',
               icon: '/icon-192.png',
             });
+            alertData.lastNotifiedAt = new Date();
+            user.markModified('priceAlerts');
+            await user.save();
           }
         } catch (err) { /* skip this item */ }
       }
@@ -1122,6 +695,9 @@ async function checkPriceAlerts() {
 
 async function sendPriceDropEmail(email, firstName, productName, currentPrice, targetPrice, url, source) {
   if (!emailTransporter) return;
+  const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  firstName = escape(firstName); productName = escape(productName); source = escape(source);
+  url = escape(require('./catalog').safeUrl(url) || '');
   try {
     await emailTransporter.sendMail({
       from: `"DRIPTRACK" <${process.env.GMAIL_USER}>`,
@@ -1162,14 +738,21 @@ app.post('/auth/price-alerts', authMiddleware, async (req, res) => {
 // PRICE ALERTS — per-product CRUD
 // ─────────────────────────────────────────────
 app.post('/auth/alerts', authMiddleware, async (req, res) => {
-  const { productName, targetPrice, productImage } = req.body;
+  const { productName, targetPrice, productImage, listingId, searchQuery } = req.body;
+  if (typeof productName !== 'string' || productName.length > 500 || typeof searchQuery !== 'string' || searchQuery.length > 120 ||
+      typeof listingId !== 'string' || !/^[a-f0-9]{24}$/.test(listingId) || !Number.isFinite(Number(targetPrice)) || Number(targetPrice) <= 0 || Number(targetPrice) > 10000000)
+    return res.status(400).json({ message: 'Select a current listing and enter a valid target price.' });
   if (!productName || targetPrice == null) return res.status(400).json({ message: 'productName and targetPrice required' });
   try {
+    const data = await pricing.search(searchQuery);
+    const sourceListing = data.results.find(r => r.id === listingId);
+    if (!sourceListing) return res.status(400).json({ message: 'This exact listing could not be confirmed. Search again before creating an alert.' });
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
     if (!user.priceAlerts) user.priceAlerts = {};
-    const key = productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60);
-    user.priceAlerts[key] = { productName, targetPrice: parseFloat(targetPrice), productImage: productImage || null, enabled: true, createdAt: new Date() };
+    const key = listingId;
+    if (!user.priceAlerts[key] && Object.keys(user.priceAlerts).length >= 100) return res.status(400).json({ message: 'You can save up to 100 alerts.' });
+    user.priceAlerts[key] = { productName: sourceListing.title, targetPrice: Number(targetPrice), productImage: sourceListing.image || null, listingId, searchQuery, enabled: true, createdAt: new Date() };
     user.markModified('priceAlerts');
     await user.save();
     res.json({ success: true, key });
@@ -1234,6 +817,11 @@ app.post('/api/push/subscribe', authMiddleware, async (req, res) => {
   const { subscription } = req.body;
   if (!subscription?.endpoint) return res.status(400).json({ message: 'Invalid subscription' });
   try {
+    const endpoint = new URL(subscription.endpoint);
+    if (endpoint.protocol !== 'https:' || !/(^|\.)(fcm.googleapis.com|push.services.mozilla.com|push.apple.com|notify.windows.com)$/.test(endpoint.hostname))
+      return res.status(400).json({ message: 'Unsupported push service.' });
+  } catch { return res.status(400).json({ message: 'Invalid subscription' }); }
+  try {
     await PushSubscription.findOneAndUpdate(
       { endpoint: subscription.endpoint },
       { userId: req.user.userId, endpoint: subscription.endpoint, keys: subscription.keys },
@@ -1255,6 +843,8 @@ async function sendPushToUser(userId, payload) {
     const subs = await PushSubscription.find({ userId });
     for (const sub of subs) {
       try {
+        const endpoint = new URL(sub.endpoint);
+        if (endpoint.protocol !== 'https:' || !/(^|\.)(fcm.googleapis.com|push.services.mozilla.com|push.apple.com|notify.windows.com)$/.test(endpoint.hostname)) continue;
         await webPush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload));
       } catch (err) {
         if (err.statusCode === 410 || err.statusCode === 404) {
@@ -1264,32 +854,6 @@ async function sendPushToUser(userId, payload) {
     }
   } catch {}
 }
-
-// ─────────────────────────────────────────────
-// BIGGEST MOVERS ENDPOINT
-// Returns products with largest price swings in last 48h
-// ─────────────────────────────────────────────
-app.get('/api/movers', async (req, res) => {
-  if (mongoose.connection.readyState !== 1) return res.json({ gainers: [], losers: [] });
-  try {
-    const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
-    const products = await PriceHistory.aggregate([
-      { $match: { timestamp: { $gte: since } } },
-      { $sort: { timestamp: 1 } },
-      { $group: { _id: '$productId', first: { $first: '$price' }, last: { $last: '$price' }, count: { $sum: 1 } } },
-      { $match: { count: { $gte: 2 } } },
-    ]);
-    const all = products.map(p => ({
-      name: p._id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-      productId: p._id,
-      firstPrice: parseFloat(p.first.toFixed(2)),
-      currentPrice: parseFloat(p.last.toFixed(2)),
-      changePct: parseFloat(((p.last - p.first) / p.first * 100).toFixed(1)),
-    })).filter(m => Math.abs(m.changePct) >= 0.3);
-    all.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
-    res.json({ gainers: all.filter(m => m.changePct > 0).slice(0, 6), losers: all.filter(m => m.changePct < 0).slice(0, 6) });
-  } catch { res.json({ gainers: [], losers: [] }); }
-});
 
 // ─────────────────────────────────────────────
 // SEARCH AUTOCOMPLETE SUGGESTIONS
@@ -1360,53 +924,11 @@ app.get('/api/suggestions', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// PRICE HISTORY CRON JOB
-// Fetches popular products every hour to build real price history
-// ─────────────────────────────────────────────
-const TRACKED_PRODUCTS = [
-  // Sneakers
-  'Nike Air Jordan 1 Chicago','Nike Air Jordan 4 Military Black','Nike Dunk Low Panda',
-  'Nike Air Force 1 Low','Nike Air Max 90','Nike Blazer Mid 77',
-  'Adidas Yeezy Boost 350 V2 Zebra','Adidas Yeezy Slide','Adidas Samba OG',
-  'Adidas Stan Smith','New Balance 550 White Green','New Balance 2002R',
-  'Asics Gel-Kayano 14','Converse Chuck Taylor 70','Vans Old Skool',
-  'Jordan 4 Military Black','Jordan 1 Retro High OG',
-  // Watches
-  'Rolex Submariner Date','Rolex Daytona 116500LN','AP Royal Oak 15500ST',
-  'Omega Speedmaster Professional','Casio G-Shock GW-M5610',
-  // Bags
-  'Louis Vuitton Neverfull MM','Gucci GG Marmont','Hermès Birkin 30',
-  'Chanel Classic Flap','Prada Re-Nylon Backpack',
-  // Streetwear
-  'Supreme Box Logo Hoodie','Off-White Industrial Belt','Essentials Fear of God Hoodie',
-  // Sunglasses
-  'Ray-Ban Aviator Classic','Oakley Frogskins',
-];
-
-async function runPriceHistoryCron() {
-  if (mongoose.connection.readyState !== 1) return;
-  console.log('\n⏰ Hourly price history cron running...');
-  for (const product of TRACKED_PRODUCTS) {
-    try {
-      const [amazon, ebay] = await Promise.all([getAmazonPrice(product), getEbayPrice(product)]);
-      const best = [amazon, ebay].filter(Boolean).sort((a, b) => (a.price || 1e9) - (b.price || 1e9))[0];
-      if (best?.price) {
-        const key = product.toLowerCase().replace(/\s+/g, '-');
-        await savePriceHistory(key, best.price, best.source);
-        console.log(`  ✓ ${product}: $${best.price} (${best.source})`);
-      }
-      await new Promise(r => setTimeout(r, 2500)); // avoid rate limits
-    } catch {}
-  }
-  console.log('✅ Cron complete');
-}
-// First run after 60s (server is fully up), then every hour
-setTimeout(runPriceHistoryCron, 60000);
-setInterval(runPriceHistoryCron, 60 * 60 * 1000);
-
 // ── UPDATE PROFILE
 app.post('/auth/update-profile', authMiddleware, async (req, res) => {
   const { firstName, lastName } = req.body;
+  if (typeof firstName !== 'string' || typeof lastName !== 'string' || firstName.length > 60 || lastName.length > 60 || /[<>]/.test(firstName + lastName))
+    return res.status(400).json({ message: 'Enter a valid first and last name.' });
   if (!firstName || !lastName) return res.status(400).json({ message: 'Name fields required' });
   try {
     await User.findByIdAndUpdate(req.user.userId, { firstName, lastName });
@@ -1417,16 +939,27 @@ app.post('/auth/update-profile', authMiddleware, async (req, res) => {
 // ── CHANGE PASSWORD
 app.post('/auth/change-password', authMiddleware, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || newPassword.length > 128)
+    return res.status(400).json({ message: 'Enter valid passwords.' });
   if (!currentPassword || !newPassword) return res.status(400).json({ message: 'All fields required' });
   if (newPassword.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters' });
   try {
     const user = await User.findById(req.user.userId);
-    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!user) return res.status(404).json({ message: 'Account not found.' });
+    const match = user.password && await bcrypt.compare(currentPassword, user.password);
     if (!match) return res.status(401).json({ message: 'Current password is incorrect' });
     user.password = await bcrypt.hash(newPassword, 12);
     await user.save();
     res.json({ success: true });
   } catch { res.status(500).json({ message: 'Server error' }); }
+});
+
+app.use((req, res) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) return res.status(404).json({ message: 'Endpoint not found.' });
+  res.status(404).sendFile(path.join(__dirname, '..', '404.html'));
+});
+app.use((err, req, res, next) => {
+  res.status(err.status === 400 ? 400 : 500).json({ message: err.status === 400 ? 'Invalid request body.' : 'The request could not be completed.' });
 });
 
 app.listen(PORT, '0.0.0.0', () => {

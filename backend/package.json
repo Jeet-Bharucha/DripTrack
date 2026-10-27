@@ -4,6 +4,7 @@
   "description": "DRIPTRACK real-time price tracking backend",
   "main": "server.js",
   "scripts": {
+    "test": "node --test catalog.test.js pricing.test.js routes.test.js",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },

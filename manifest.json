@@ -1,12 +1,12 @@
 {
-  "name": "DRIPTRACK — Real-Time Price Intelligence",
+  "name": "DripTrack",
   "short_name": "DripTrack",
-  "description": "Real-time price tracking for sneakers, watches, bags & streetwear across Nike, StockX, GOAT, Amazon & more.",
-  "start_url": "/index.html?source=pwa",
+  "description": "Discover sourced product listings and save your shortlist.",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a0a0a",
+  "background_color": "#f6f5f0",
+  "theme_color": "#243d32",
   "orientation": "portrait-primary",
   "lang": "en",
   "icons": [
@@ -23,31 +23,10 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["shopping", "finance", "lifestyle"],
-  "screenshots": [],
-  "shortcuts": [
-    {
-      "name": "Search Products",
-      "short_name": "Search",
-      "url": "/index.html#search",
-      "description": "Search for real-time product prices",
-      "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect width='96' height='96' fill='%230a0a0a'/><text x='48' y='66' font-size='50' text-anchor='middle'>🔍</text></svg>", "sizes": "96x96" }]
-    },
-    {
-      "name": "My Watchlist",
-      "short_name": "Watchlist",
-      "url": "/watchlist.html",
-      "description": "View your saved products",
-      "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect width='96' height='96' fill='%230a0a0a'/><text x='48' y='66' font-size='50' text-anchor='middle'>❤️</text></svg>", "sizes": "96x96" }]
-    },
-    {
-      "name": "My Account",
-      "short_name": "Account",
-      "url": "/account.html",
-      "description": "View your account and price alerts",
-      "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect width='96' height='96' fill='%230a0a0a'/><text x='48' y='66' font-size='50' text-anchor='middle'>👤</text></svg>", "sizes": "96x96" }]
-    }
+  "categories": [
+    "shopping"
   ],
+  "screenshots": [],
   "related_applications": [],
   "prefer_related_applications": false
 }
