@@ -2,7 +2,7 @@
 // DRIPTRACK Service Worker
 // Handles: PWA install, offline cache, push notifications
 // ─────────────────────────────────────────────
-const CACHE_NAME = 'driptrack-v1';
+const CACHE_NAME = 'driptrack-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -42,7 +42,7 @@ self.addEventListener('fetch', event => {
   // Skip: non-GET, API calls, external resources
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;
-  if (!url.origin.includes(self.location.hostname) && !url.origin.includes('localhost')) return;
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
     fetch(request)

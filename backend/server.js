@@ -6,11 +6,14 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'driptrack_secret_key_change_in_production';
+const JWT_SECRET = process.env.JWT_SECRET || require('crypto').randomBytes(48).toString('hex');
+const PUBLIC_URL = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || (process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : `http://localhost:${PORT}`)).replace(/\/$/, '');
 
 app.use(cors());
 app.use(express.json());
@@ -26,7 +29,17 @@ app.get('/app', (req, res) => {
 });
 
 // Static files (index: false prevents express from auto-serving index.html for /)
-app.use(express.static(path.join(__dirname, '..'), { index: false }));
+const publicFiles = new Set([
+  'landing.html', 'index.html', 'login.html', 'register.html', 'resetpassword.html',
+  'account.html', 'watchlist.html', 'product.html', '404.html', 'api-connector.js',
+  'sw.js', 'manifest.json', 'Drip Track Logo.png', 'icon-192.png', 'icon-512.png',
+]);
+app.use((req, res, next) => {
+  let file;
+  try { file = decodeURIComponent(req.path).slice(1); } catch { return res.sendStatus(400); }
+  if (!publicFiles.has(file)) return next();
+  res.sendFile(path.join(__dirname, '..', file));
+});
 
 // ─────────────────────────────────────────────
 // MONGODB CONNECTION
@@ -97,11 +110,10 @@ async function sendVerificationEmail(email, firstName, token) {
   const transporter = emailTransporter;
   if (!transporter) {
     console.log('⚠️  Email not configured — skipping verification email');
-    console.log(`   Verify link: http://localhost:${PORT}/auth/verify?token=${token}`);
     return false;
   }
   console.log(`📧 Sending verification email to ${email}...`);
-  const verifyUrl = `http://localhost:${PORT}/auth/verify?token=${token}`;
+  const verifyUrl = `${PUBLIC_URL}/auth/verify?token=${encodeURIComponent(token)}`;
   await transporter.sendMail({
     from: `"DRIPTRACK" <${process.env.GMAIL_USER}>`,
     to: email,
@@ -129,11 +141,10 @@ async function sendPasswordResetEmail(email, firstName, token) {
   const transporter = emailTransporter;
   if (!transporter) {
     console.log('⚠️  Email not configured — skipping reset email');
-    console.log(`   Reset link: http://localhost:${PORT}/reset-password.html?token=${token}`);
     return false;
   }
   console.log(`📧 Sending password reset email to ${email}...`);
-  const resetUrl = `http://localhost:${PORT}/resetpassword.html?token=${token}`;
+  const resetUrl = `${PUBLIC_URL}/resetpassword.html?token=${encodeURIComponent(token)}`;
   await transporter.sendMail({
     from: `"DRIPTRACK" <${process.env.GMAIL_USER}>`,
     to: email,
@@ -323,10 +334,8 @@ app.post('/auth/forgot-password', async (req, res) => {
     } else {
       console.log(`⚠️  Email not sent — check GMAIL_USER and GMAIL_PASS in .env`);
     }
-    // Always print the direct link in terminal for easy access during development
-    console.log(`🔗 Direct reset link: http://localhost:${PORT}/resetpassword.html?token=${resetToken}`);
-
-    res.json({ success: true, message: 'Password reset email sent' });
+    if (!emailSent) return res.status(503).json({ message: 'Password reset email is unavailable. Please try again later.' });
+    res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
 
   } catch (err) {
     console.error('❌ Forgot password error:', err.message);

@@ -2,6 +2,8 @@
 
 Real-time price tracking for sneakers, watches, bags, and streetwear across Nike, GOAT, StockX, Amazon, and more. Only authentic products.
 
+Website: https://driptrack-fgvs.onrender.com
+
 ---
 
 ## Features
@@ -76,7 +78,7 @@ Real-time price tracking for sneakers, watches, bags, and streetwear across Nike
 
 5. **Open in browser**
    ```
-   http://localhost:3000
+   http://localhost:3001
    ```
 
 ---
