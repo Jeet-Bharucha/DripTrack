@@ -4,22 +4,24 @@
   "description": "DRIPTRACK real-time price tracking backend",
   "main": "server.js",
   "scripts": {
-    "test": "node --test catalog.test.js pricing.test.js routes.test.js",
+    "test": "node --test catalog.test.js pricing.test.js security.test.js shop-utils.test.js routes.test.js",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "axios": "^1.6.0",
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.0.0",
-    "nodemailer": "^8.0.3",
+    "axios": "^1.21.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.3",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.24.7",
+    "nodemailer": "^10.2.1",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=24.22.1 <25"
   }
 }

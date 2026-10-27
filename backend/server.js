@@ -1,5 +1,4 @@
 const express = require('express');
-const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
 const mongoose = require('mongoose');
@@ -7,6 +6,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const pricing = require('./pricing');
+const security = require('./security');
+const {evaluateAlert} = require('./alerts');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -16,29 +17,34 @@ const PUBLIC_URL = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL ||
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   : `http://localhost:${PORT}`)).replace(/\/$/, '');
 
-app.use(cors());
-app.use(express.json());
+const sessions = security.sessionTools(PUBLIC_URL, JWT_SECRET);
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(security.securityHeaders);
+app.use(security.requestGuard(PUBLIC_URL));
+app.use(express.json({limit:'24kb',strict:true}));
+app.use((req,res,next) => {
+  if (req.body === null || Array.isArray(req.body)) return res.status(400).json({message:'A JSON object is required.'});
+  req.body = req.body || {};
+  next();
+});
+app.use(['/auth/login','/auth/register','/auth/forgot-password'],security.limiter({max:20,windowMs:15*60*1000,key:req=>req.ip}));
+app.use('/auth/login',security.limiter({max:8,windowMs:15*60*1000,key:req=>req.ip+':'+security.digest(typeof req.body.email==='string'?req.body.email.trim().toLowerCase():'invalid')}));
 app.use('/auth', (req, res, next) => {
   if (mongoose.connection.readyState !== 1) return res.status(503).json({ message: 'Account services are temporarily unavailable. Please try again later.' });
   next();
 });
-app.disable('x-powered-by');
-app.set('trust proxy', 1);
-app.use((req, res, next) => {
-  res.set('X-Content-Type-Options', 'nosniff');
-  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.set('X-Frame-Options', 'DENY');
-  if (req.path.startsWith('/auth/')) res.set('Cache-Control', 'no-store');
-  next();
-});
 const requestWindows = new Map();
-app.use(['/auth', '/api/prices', '/api/listing'], (req, res, next) => {
+app.use(['/auth', '/api/prices', '/api/listing','/api/push'], (req, res, next) => {
   const key = `${req.ip}:${req.baseUrl === '/auth' ? 'auth' : 'prices'}`;
   const now = Date.now();
   let window = requestWindows.get(key);
   if (!window || now > window.until) { window = { count: 0, until: now + 600000 }; requestWindows.set(key, window); }
-  if (requestWindows.size > 5000) for (const [k,v] of requestWindows) if (v.until < now) requestWindows.delete(k);
-  if (++window.count > 60) return res.status(429).json({ message: 'Too many requests. Please try again in a few minutes.' });
+  if (requestWindows.size > 5000) {
+    for (const [k,v] of requestWindows) if (v.until < now) requestWindows.delete(k);
+    if (requestWindows.size > 10000) return res.status(429).json({message:'Please try again later.'});
+  }
+  if (++window.count > 120) { res.set('Retry-After','600'); return res.status(429).json({ message: 'Too many requests. Please try again in a few minutes.' }); }
   next();
 });
 
@@ -57,7 +63,7 @@ const publicFiles = new Set([
   'landing.html', 'index.html', 'login.html', 'register.html', 'resetpassword.html',
   'account.html', 'watchlist.html', 'product.html', '404.html', 'api-connector.js',
   'sw.js', 'manifest.json', 'Drip Track Logo.png', 'icon-192.png', 'icon-512.png',
-  'site.css', 'site.js', 'about.html',
+  'site.css', 'site.js', 'shop-utils.js', 'about.html',
 ]);
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
@@ -94,9 +100,12 @@ const userSchema = new mongoose.Schema({
   priceAlerts:      { type: mongoose.Schema.Types.Mixed, default: {} },
   avatar:           { type: String, default: '' },
   createdAt:        { type: Date, default: Date.now },
+  sessions:        [{hash:String,createdAt:Date,expiresAt:Date}],
 });
+userSchema.index({'sessions.hash':1});
 
 const User = mongoose.model('User', userSchema);
+const DUMMY_PASSWORD_HASH=bcrypt.hashSync('non-user-placeholder-for-timing-only',12);
 
 // ─────────────────────────────────────────────
 // EMAIL SERVICE (Nodemailer)
@@ -196,16 +205,49 @@ async function sendPasswordResetEmail(email, firstName, token) {
 // ─────────────────────────────────────────────
 // AUTH MIDDLEWARE
 // ─────────────────────────────────────────────
-function authMiddleware(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ message: 'No token provided' });
+async function authMiddleware(req, res, next) {
+  const value = sessions.read(req);
+  if (!/^[a-f0-9]{64}$/.test(value)) return res.status(401).json({ message: 'Please sign in.' });
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const hash = security.digest(value);
+    const user = await User.findOne({'sessions.hash':hash});
+    const current = user?.sessions?.find(s => s.hash === hash && new Date(s.expiresAt).getTime() > Date.now());
+    if (!current) { sessions.clear(res); return res.status(401).json({message:'Your session has expired. Please sign in.'}); }
+    if (!['GET','HEAD'].includes(req.method) && !sessions.checkCsrf(req,value)) return res.status(403).json({message:'Your security token has expired. Reload the page and try again.'});
+    req.user = {userId:user._id,email:user.email}; req.account=user; req.sessionHash=hash;
     next();
   } catch {
-    res.status(401).json({ message: 'Invalid or expired token' });
+    res.status(503).json({ message: 'Account services are temporarily unavailable.' });
   }
 }
+
+async function createSession(user,res) {
+  const issued=sessions.issue(res);
+  const updated=await User.findOneAndUpdate({_id:user._id,password:user.password},{$push:{sessions:{$each:[issued.record],$slice:-10}}},{new:true});
+  if(!updated){sessions.clear(res);throw new Error('Account credentials changed during sign-in');}
+  return sessions.csrf(issued.value);
+}
+app.get('/auth/session',async(req,res)=>{
+  if(!/^[a-f0-9]{64}$/.test(sessions.read(req)))return res.json({authenticated:false});
+  return authMiddleware(req,res,()=>res.json({authenticated:true,user:security.publicUser(req.account),csrfToken:sessions.csrf(sessions.read(req))}));
+});
+app.post('/auth/logout',authMiddleware,async(req,res)=>{
+  await User.findByIdAndUpdate(req.user.userId,{$pull:{sessions:{hash:req.sessionHash}}});sessions.clear(res);res.json({success:true});
+});
+app.post('/auth/logout-all',authMiddleware,async(req,res)=>{
+  await User.findByIdAndUpdate(req.user.userId,{$set:{sessions:[]}});sessions.clear(res);res.json({success:true});
+});
+app.post('/auth/resend-verification',authMiddleware,security.limiter({max:3,windowMs:60*60*1000,key:req=>String(req.user.userId)}),async(req,res)=>{
+  if(req.account.verified)return res.json({success:true,message:'Your email is already verified.'});
+  if(!emailTransporter)return res.status(503).json({message:'Verification email is temporarily unavailable.'});
+  try{
+    const token=jwt.sign({email:req.account.email,purpose:'verify',nonce:require('crypto').randomBytes(16).toString('hex')},JWT_SECRET,{expiresIn:'24h',algorithm:'HS256'});
+    req.account.verifyToken=security.digest(token);await req.account.save();
+    const sent=await sendVerificationEmail(req.account.email,req.account.firstName,token);
+    if(!sent)return res.status(503).json({message:'Verification email is temporarily unavailable.'});
+    res.json({success:true,message:'Verification email requested. Check your inbox.'});
+  }catch{res.status(503).json({message:'Verification email is temporarily unavailable.'});}
+});
 
 // ─────────────────────────────────────────────
 // AUTH ROUTES
@@ -215,9 +257,7 @@ function authMiddleware(req, res, next) {
 app.post('/auth/register', async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
 
-  if (![firstName, lastName, email, password].every(v => typeof v === 'string') ||
-      firstName.trim().length < 1 || lastName.trim().length < 1 || firstName.length > 60 || lastName.length > 60 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || password.length > 128 || /[<>]/.test(firstName + lastName))
+  if (!security.cleanName(firstName) || !security.cleanName(lastName) || !security.validEmail(email) || !security.validPassword(password))
     return res.status(400).json({ message: 'Enter a valid name, email and password.' });
 
   if (!firstName || !lastName || !email || !password)
@@ -235,7 +275,7 @@ app.post('/auth/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Create verify token
-    const verifyToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
+    const verifyToken = jwt.sign({ email:email.trim().toLowerCase(),purpose:'verify',nonce:require('crypto').randomBytes(16).toString('hex') }, JWT_SECRET, { expiresIn: '24h',algorithm:'HS256' });
 
     // Save user
     const user = new User({
@@ -243,7 +283,7 @@ app.post('/auth/register', async (req, res) => {
       lastName,
       email: email.trim().toLowerCase(),
       password: hashedPassword,
-      verifyToken,
+      verifyToken:security.digest(verifyToken),
       verified: false,
     });
     await user.save();
@@ -277,24 +317,18 @@ app.post('/auth/login', async (req, res) => {
 
   try {
     const user = await User.findOne({ email: email.trim().toLowerCase() });
-    if (!user)
-      return res.status(401).json({ message: 'Email or password is incorrect' });
+    if (!user) { await bcrypt.compare(password,DUMMY_PASSWORD_HASH); return res.status(401).json({ message: 'Email or password is incorrect' }); }
 
     const passwordMatch = user.password && await bcrypt.compare(password, user.password);
     if (!passwordMatch)
       return res.status(401).json({ message: 'Email or password is incorrect' });
 
-    // Generate JWT token — expires in 7 days
-    const token = jwt.sign(
-      { userId: user._id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const csrfToken = await createSession(user,res);
 
     console.log(`✅ User logged in: ${email}`);
     res.json({
       success: true,
-      token,
+      csrfToken,
       user: {
         id: user._id,
         firstName: user.firstName,
@@ -315,8 +349,9 @@ app.post('/auth/login', async (req, res) => {
 app.get('/auth/verify', async (req, res) => {
   const { token } = req.query;
   try {
-    const { email } = jwt.verify(token, JWT_SECRET);
-    const user = await User.findOneAndUpdate({ email, verifyToken: token }, { verified: true, verifyToken: null });
+    const { email,purpose } = jwt.verify(token, JWT_SECRET,{algorithms:['HS256']});
+    if(purpose!=='verify')return res.redirect('/login.html?error=invalid_token');
+    const user = await User.findOneAndUpdate({ email, verifyToken: security.digest(token) }, { verified: true, verifyToken: null });
     if (!user) return res.redirect('/login.html?error=invalid_token');
     res.redirect('/login.html?verified=true');
   } catch {
@@ -327,9 +362,9 @@ app.get('/auth/verify', async (req, res) => {
 // GET CURRENT USER
 app.get('/auth/me', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password -verifyToken -resetToken');
+    const user = req.account;
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json({ user });
+    res.json({ user:security.publicUser(user),csrfToken:sessions.csrf(sessions.read(req)) });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -338,7 +373,8 @@ app.get('/auth/me', authMiddleware, async (req, res) => {
 // FORGOT PASSWORD
 app.post('/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
-  if (typeof email !== 'string' || email.length > 254) return res.status(400).json({ message: 'Enter a valid email address.' });
+  if (!security.validEmail(email)) return res.status(400).json({ message: 'Enter a valid email address.' });
+  if (!emailTransporter) return res.status(503).json({message:'Password reset email is temporarily unavailable.'});
   if (!email) return res.status(400).json({ message: 'Email is required' });
 
   console.log(`\n🔑 Password reset requested for: ${email}`);
@@ -358,31 +394,30 @@ app.post('/auth/forgot-password', async (req, res) => {
     }
 
     console.log(`✅ User found: ${user.firstName} — generating reset token...`);
-    const resetToken = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
-    user.resetToken = resetToken;
+    const resetToken = jwt.sign({ userId: user._id,purpose:'reset',nonce:require('crypto').randomBytes(16).toString('hex') }, JWT_SECRET, { expiresIn: '1h',algorithm:'HS256' });
+    user.resetToken = security.digest(resetToken);
     user.resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
     await user.save();
     console.log(`✅ Reset token saved to database`);
 
-    const emailSent = await sendPasswordResetEmail(email, user.firstName, resetToken);
+    const emailSent = await sendPasswordResetEmail(email, user.firstName, resetToken).catch(()=>false);
     if (emailSent) {
       console.log(`✅ Reset email sent successfully to ${email}`);
     } else {
       console.log(`⚠️  Email not sent — check GMAIL_USER and GMAIL_PASS in .env`);
     }
-    if (!emailSent) return res.status(503).json({ message: 'Password reset email is unavailable. Please try again later.' });
     res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
 
   } catch (err) {
     console.error('❌ Forgot password error:', err.message);
-    res.status(500).json({ message: 'Server error — ' + err.message });
+    res.status(500).json({ message: 'Password reset is temporarily unavailable.' });
   }
 });
 
 // RESET PASSWORD
 app.post('/auth/reset-password', async (req, res) => {
   const { token, newPassword } = req.body;
-  if (typeof token !== 'string' || typeof newPassword !== 'string' || newPassword.length > 128)
+  if (typeof token !== 'string' || token.length > 2000 || !security.validPassword(newPassword))
     return res.status(400).json({ message: 'Enter a valid reset token and password.' });
   if (!token || !newPassword)
     return res.status(400).json({ message: 'Token and new password are required' });
@@ -390,17 +425,17 @@ app.post('/auth/reset-password', async (req, res) => {
     return res.status(400).json({ message: 'Password must be at least 8 characters' });
 
   try {
-    const { userId } = jwt.verify(token, JWT_SECRET);
+    const { userId,purpose } = jwt.verify(token, JWT_SECRET,{algorithms:['HS256']});
+    if(purpose!=='reset')return res.status(400).json({message:'Invalid or expired reset link'});
     const user = await User.findById(userId);
-    if (!user || user.resetToken !== token)
+    if (!user || !security.equal(user.resetToken,security.digest(token)))
       return res.status(400).json({ message: 'Invalid or expired reset link' });
     if (user.resetTokenExpiry < new Date())
       return res.status(400).json({ message: 'Reset link has expired — request a new one' });
 
-    user.password = await bcrypt.hash(newPassword, 12);
-    user.resetToken = null;
-    user.resetTokenExpiry = null;
-    await user.save();
+    const password=await bcrypt.hash(newPassword,12);
+    const consumed=await User.findOneAndUpdate({_id:userId,resetToken:security.digest(token),resetTokenExpiry:{$gt:new Date()}},{$set:{password,resetToken:null,resetTokenExpiry:null,sessions:[]}});
+    if(!consumed)return res.status(400).json({message:'Invalid or expired reset link'});
 
     res.json({ success: true, message: 'Password reset successfully' });
   } catch {
@@ -451,12 +486,13 @@ app.get('/auth/google/callback', async (req, res) => {
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
       redirect_uri:  getGoogleRedirectUri(req),
       grant_type:    'authorization_code',
-    });
+    },{timeout:10000});
     const { access_token } = tokenRes.data;
 
     // 2. Fetch Google profile
     const profileRes = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${access_token}` },
+      timeout:10000,
     });
     const { sub: googleId, email, given_name, family_name, picture, email_verified } = profileRes.data;
     if (!email || !email_verified) return res.redirect('/login.html?error=google_no_email');
@@ -487,28 +523,11 @@ app.get('/auth/google/callback', async (req, res) => {
       console.log(`✅ Google linked to existing account: ${email}`);
     }
 
-    // 4. Issue JWT (same 7-day token as normal login)
-    const token = jwt.sign(
-      { userId: user._id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    const userData = encodeURIComponent(JSON.stringify({
-      id:        user._id,
-      firstName: user.firstName,
-      lastName:  user.lastName,
-      email:     user.email,
-      verified:  user.verified,
-      avatar:    user.avatar,
-      createdAt: user.createdAt,
-    }));
-
-    // 5. Redirect to frontend — login.html reads ?token= and ?user= from URL
-    res.redirect(`/login.html#token=${encodeURIComponent(token)}`);
+    await createSession(user,res);
+    res.redirect('/watchlist.html');
 
   } catch (err) {
-    console.error('Google OAuth error:', err.response?.data || err.message);
+    console.error('Google OAuth sign-in failed');
     res.redirect('/login.html?error=google_failed');
   }
 });
@@ -519,7 +538,7 @@ app.post('/auth/watchlist', authMiddleware, async (req, res) => {
   if (typeof product !== 'string' || product.length > 10000) return res.status(400).json({ message: 'A valid listing is required' });
   let listing;
   try { listing = JSON.parse(product); } catch { return res.status(400).json({ message: 'A valid listing is required' }); }
-  if (!/^[a-f0-9]{24}$/.test(listing.id) || typeof listing.title !== 'string') return res.status(400).json({ message: 'Save a current source listing.' });
+  if (!listing || typeof listing !== 'object' || !/^[a-f0-9]{24}$/.test(listing.id) || typeof listing.title !== 'string') return res.status(400).json({ message: 'Save a current source listing.' });
   try {
     if (typeof listing.searchQuery !== 'string' || listing.searchQuery.length < 2 || listing.searchQuery.length > 120)
       return res.status(400).json({ message: 'This listing is missing its original search.' });
@@ -547,11 +566,34 @@ app.get('/auth/watchlist', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+app.delete('/auth/watchlist/id/:id',authMiddleware,async(req,res)=>{
+  if(!/^[a-f0-9]{24}$/.test(req.params.id))return res.status(400).json({message:'Invalid listing ID.'});
+  const user=req.account;
+  const before=user.watchlist.length;
+  user.watchlist=user.watchlist.filter(raw=>{try{return JSON.parse(raw)?.id!==req.params.id;}catch{return true;}});
+  if(user.watchlist.length===before)return res.status(404).json({message:'Saved listing not found.'});
+  try{await user.save();res.json({success:true});}catch{res.status(503).json({message:'Could not remove listing.'});}
+});
+app.post('/auth/watchlist/refresh',authMiddleware,security.limiter({max:6,windowMs:600000,key:req=>String(req.user.userId)}),async(req,res)=>{
+  const id=req.body.id;
+  if(typeof id!=='string'||!/^[a-f0-9]{24}$/.test(id))return res.status(400).json({message:'Choose one saved listing to refresh.'});
+  const user=req.account;
+  const index=user.watchlist.findIndex(raw=>{try{return JSON.parse(raw)?.id===id;}catch{return false;}});
+  if(index<0)return res.status(404).json({message:'Saved listing not found.'});
+  try{
+    const previous=JSON.parse(user.watchlist[index]);const data=await pricing.search(previous.searchQuery);
+    const current=data.results.find(r=>r.id===id);
+    if(!current)return res.status(404).json({message:'This exact listing is not in the current results. The saved snapshot has been kept.'});
+    const item={...current,searchQuery:previous.searchQuery,previousPrice:previous.price,previousFetchedAt:previous.fetchedAt};
+    user.watchlist[index]=JSON.stringify(item);await user.save();
+    res.json({success:true,item,cached:!!data.cached});
+  }catch{res.status(503).json({message:'Could not refresh this listing. Your saved snapshot has been kept.'});}
+});
 
 // WATCHLIST — remove product by index
 app.delete('/auth/watchlist/:index', authMiddleware, async (req, res) => {
-  const index = parseInt(req.params.index);
-  if (isNaN(index)) return res.status(400).json({ message: 'Invalid index' });
+  const index = Number(req.params.index);
+  if (!/^(0|[1-9]\d*)$/.test(req.params.index) || !Number.isSafeInteger(index)) return res.status(400).json({ message: 'Invalid index' });
   try {
     const user = await User.findById(req.user.userId).select('watchlist');
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -567,9 +609,13 @@ app.delete('/auth/watchlist/:index', authMiddleware, async (req, res) => {
 
 // DELETE ACCOUNT
 app.delete('/auth/account', authMiddleware, async (req, res) => {
+  if(req.body.confirmation!=='DELETE')return res.status(400).json({message:'Confirm account deletion by typing DELETE.'});
+  const current=req.account.sessions.find(s=>s.hash===req.sessionHash);
+  if(!current||Date.now()-new Date(current.createdAt).getTime()>10*60000)return res.status(403).json({message:'Please sign out and sign in again before deleting your account.'});
   try {
     await User.findByIdAndDelete(req.user.userId);
     await PushSubscription.deleteMany({ userId: req.user.userId });
+    sessions.clear(res);
     res.json({ success: true, message: 'Account deleted' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -659,42 +705,47 @@ app.get('/api/status', (req, res) => {
 // PRICE DROP ALERT CHECKER
 // Runs every 30 minutes, checks all users' watchlists
 // ─────────────────────────────────────────────
+let alertRunActive=false;
 async function checkPriceAlerts() {
-  if (mongoose.connection.readyState !== 1) return;
+  if (mongoose.connection.readyState !== 1 || alertRunActive) return;
+  alertRunActive=true;
   try {
     const users = await User.find({ priceAlerts: { $exists: true, $ne: {} } });
     console.log(`\n🔔 Checking price alerts for ${users.length} users...`);
     for (const user of users) {
+      if(!user.verified)continue;
       if (!user.priceAlerts || !Object.keys(user.priceAlerts).length) continue;
       for (const [index, alertData] of Object.entries(user.priceAlerts)) {
-        if (!alertData.enabled || !alertData.targetPrice || !alertData.productName || !alertData.listingId || !alertData.searchQuery) continue;
-        if (alertData.lastNotifiedAt && Date.now() - new Date(alertData.lastNotifiedAt).getTime() < 86400000) continue;
+        if (!alertData || typeof alertData!=='object' || !alertData.enabled || !alertData.targetPrice || !alertData.productName || !alertData.listingId || !alertData.searchQuery) continue;
         try {
           const data = await pricing.search(alertData.searchQuery);
-          const best = data.results.find(r => r.id === alertData.listingId);
-          if (!best) continue;
-          if (best.price <= alertData.targetPrice) {
+          const evaluation=evaluateAlert(alertData,data.results);
+          alertData.status=evaluation.status;alertData.checkedAt=evaluation.checkedAt;
+          if(evaluation.lastPrice)alertData.lastPrice=evaluation.lastPrice;
+          if(evaluation.rearm)alertData.triggered=false;
+          if (evaluation.notify) {
+            const best=evaluation.item;
             console.log(`📉 Price drop! ${alertData.productName} now $${best.price} (target: $${alertData.targetPrice}) — alerting ${user.email}`);
-            await sendPriceDropEmail(user.email, user.firstName, alertData.productName, best.price, alertData.targetPrice, best.url, best.source);
+            const emailSent=await sendPriceDropEmail(user.email, user.firstName, alertData.productName, best.price, alertData.targetPrice, best.url, best.source);
             // Also send push notification
-            await sendPushToUser(user._id, {
+            const pushSent=await sendPushToUser(user._id, {
               title: '📉 Price Drop Alert — DripTrack',
               body: `${alertData.productName} is now $${best.price.toFixed(2)} on ${best.source} (your target: $${parseFloat(alertData.targetPrice).toFixed(2)})`,
               url: best.url || '/',
               icon: '/icon-192.png',
             });
-            alertData.lastNotifiedAt = new Date();
-            user.markModified('priceAlerts');
-            await user.save();
+            if(emailSent||pushSent){alertData.lastNotifiedAt=new Date();alertData.triggered=true;alertData.status='notified';}
+            else alertData.status='delivery_failed';
           }
-        } catch (err) { /* skip this item */ }
+        } catch (err) { alertData.status='check_failed'; }
       }
+      user.markModified('priceAlerts');await user.save();
     }
-  } catch (err) { console.error('Alert check error:', err.message); }
+  } catch (err) { console.error('Alert check failed'); } finally { alertRunActive=false; }
 }
 
 async function sendPriceDropEmail(email, firstName, productName, currentPrice, targetPrice, url, source) {
-  if (!emailTransporter) return;
+  if (!emailTransporter) return false;
   const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   firstName = escape(firstName); productName = escape(productName); source = escape(source);
   url = escape(require('./catalog').safeUrl(url) || '');
@@ -718,29 +769,24 @@ async function sendPriceDropEmail(email, firstName, productName, currentPrice, t
           <p style="color:#444;font-size:11px;margin-top:24px">You're receiving this because you set a price alert on DRIPTRACK.</p>
         </div>`,
     });
-  } catch (err) { console.error('Price drop email error:', err.message); }
+    return true;
+  } catch (err) { console.error('Price drop email delivery failed');return false; }
 }
 
 // Run price alert check every 30 minutes
 setInterval(checkPriceAlerts, 30 * 60 * 1000);
 
 // SAVE PRICE ALERTS (called from account page)
-app.post('/auth/price-alerts', authMiddleware, async (req, res) => {
-  const { alerts } = req.body;
-  if (!alerts) return res.status(400).json({ message: 'Alerts data required' });
-  try {
-    await User.findByIdAndUpdate(req.user.userId, { priceAlerts: alerts });
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ message: 'Server error' }); }
-});
+app.post('/auth/price-alerts', authMiddleware, (req,res)=>res.status(410).json({message:'Use exact-listing alerts from a current product page.'}));
 
 // ─────────────────────────────────────────────
 // PRICE ALERTS — per-product CRUD
 // ─────────────────────────────────────────────
 app.post('/auth/alerts', authMiddleware, async (req, res) => {
+  if(!req.account.verified)return res.status(403).json({message:'Verify your email before creating email alerts. You can resend verification from your account.'});
   const { productName, targetPrice, productImage, listingId, searchQuery } = req.body;
   if (typeof productName !== 'string' || productName.length > 500 || typeof searchQuery !== 'string' || searchQuery.length > 120 ||
-      typeof listingId !== 'string' || !/^[a-f0-9]{24}$/.test(listingId) || !Number.isFinite(Number(targetPrice)) || Number(targetPrice) <= 0 || Number(targetPrice) > 10000000)
+      typeof listingId !== 'string' || !/^[a-f0-9]{24}$/.test(listingId) || typeof targetPrice !== 'number' || !Number.isFinite(targetPrice) || targetPrice <= 0 || targetPrice > 10000000)
     return res.status(400).json({ message: 'Select a current listing and enter a valid target price.' });
   if (!productName || targetPrice == null) return res.status(400).json({ message: 'productName and targetPrice required' });
   try {
@@ -749,7 +795,7 @@ app.post('/auth/alerts', authMiddleware, async (req, res) => {
     if (!sourceListing) return res.status(400).json({ message: 'This exact listing could not be confirmed. Search again before creating an alert.' });
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
-    if (!user.priceAlerts) user.priceAlerts = {};
+    if (!user.priceAlerts || typeof user.priceAlerts!=='object' || Array.isArray(user.priceAlerts)) user.priceAlerts = {};
     const key = listingId;
     if (!user.priceAlerts[key] && Object.keys(user.priceAlerts).length >= 100) return res.status(400).json({ message: 'You can save up to 100 alerts.' });
     user.priceAlerts[key] = { productName: sourceListing.title, targetPrice: Number(targetPrice), productImage: sourceListing.image || null, listingId, searchQuery, enabled: true, createdAt: new Date() };
@@ -762,11 +808,12 @@ app.post('/auth/alerts', authMiddleware, async (req, res) => {
 app.get('/auth/alerts', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('priceAlerts');
-    res.json({ alerts: user?.priceAlerts || {} });
+    res.json({ alerts: user?.priceAlerts && typeof user.priceAlerts==='object'&&!Array.isArray(user.priceAlerts) ? user.priceAlerts : {} });
   } catch { res.status(500).json({ message: 'Server error' }); }
 });
 
 app.delete('/auth/alerts/:key', authMiddleware, async (req, res) => {
+  if(!/^[a-f0-9]{24}$/.test(req.params.key)&&!/^[-a-z0-9]{1,80}$/.test(req.params.key))return res.status(400).json({message:'Invalid alert ID.'});
   try {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -774,6 +821,18 @@ app.delete('/auth/alerts/:key', authMiddleware, async (req, res) => {
     await user.save();
     res.json({ success: true });
   } catch { res.status(500).json({ message: 'Server error' }); }
+});
+app.patch('/auth/alerts/:key',authMiddleware,async(req,res)=>{
+  if(!/^[a-f0-9]{24}$/.test(req.params.key)||!['enabled','targetPrice'].some(k=>Object.hasOwn(req.body,k)))return res.status(400).json({message:'Choose an alert and a valid update.'});
+  if(Object.hasOwn(req.body,'enabled')&&typeof req.body.enabled!=='boolean')return res.status(400).json({message:'Enabled must be true or false.'});
+  if(Object.hasOwn(req.body,'targetPrice')&&(typeof req.body.targetPrice!=='number'||!Number.isFinite(req.body.targetPrice)||req.body.targetPrice<=0||req.body.targetPrice>10000000))return res.status(400).json({message:'Enter a valid target price.'});
+  const user=req.account,alert=user.priceAlerts?.[req.params.key];
+  if(!alert)return res.status(404).json({message:'Alert not found.'});
+  if(req.body.enabled===true&&!user.verified)return res.status(403).json({message:'Verify your email to enable alerts.'});
+  if(Object.hasOwn(req.body,'enabled'))alert.enabled=req.body.enabled;
+  if(Object.hasOwn(req.body,'targetPrice'))alert.targetPrice=req.body.targetPrice;
+  alert.triggered=false;user.markModified('priceAlerts');
+  try{await user.save();res.json({success:true});}catch{res.status(503).json({message:'Could not update this alert.'});}
 });
 
 // ─────────────────────────────────────────────
@@ -815,13 +874,16 @@ app.get('/api/push/vapid-public-key', (req, res) => {
 
 app.post('/api/push/subscribe', authMiddleware, async (req, res) => {
   const { subscription } = req.body;
-  if (!subscription?.endpoint) return res.status(400).json({ message: 'Invalid subscription' });
+  if (typeof subscription?.endpoint!=='string'||subscription.endpoint.length>2048||typeof subscription.keys?.p256dh!=='string'||typeof subscription.keys?.auth!=='string'||subscription.keys.p256dh.length>200||subscription.keys.auth.length>100) return res.status(400).json({ message: 'Invalid subscription' });
   try {
     const endpoint = new URL(subscription.endpoint);
-    if (endpoint.protocol !== 'https:' || !/(^|\.)(fcm.googleapis.com|push.services.mozilla.com|push.apple.com|notify.windows.com)$/.test(endpoint.hostname))
+    if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || !/(^|\.)(fcm.googleapis.com|push.services.mozilla.com|push.apple.com|notify.windows.com)$/.test(endpoint.hostname))
       return res.status(400).json({ message: 'Unsupported push service.' });
   } catch { return res.status(400).json({ message: 'Invalid subscription' }); }
   try {
+    const existing=await PushSubscription.findOne({endpoint:subscription.endpoint});
+    if(existing&&String(existing.userId)!==String(req.user.userId))return res.status(409).json({message:'This subscription cannot be changed by this account.'});
+    if(!existing&&await PushSubscription.countDocuments({userId:req.user.userId})>=10)return res.status(400).json({message:'You can register up to 10 push subscriptions.'});
     await PushSubscription.findOneAndUpdate(
       { endpoint: subscription.endpoint },
       { userId: req.user.userId, endpoint: subscription.endpoint, keys: subscription.keys },
@@ -833,12 +895,13 @@ app.post('/api/push/subscribe', authMiddleware, async (req, res) => {
 
 app.delete('/api/push/unsubscribe', authMiddleware, async (req, res) => {
   const { endpoint } = req.body;
-  if (endpoint) await PushSubscription.deleteOne({ endpoint }).catch(() => {});
+  if (typeof endpoint === 'string') await PushSubscription.deleteOne({ endpoint,userId:req.user.userId }).catch(() => {});
   res.json({ success: true });
 });
 
 async function sendPushToUser(userId, payload) {
-  if (!webPush || mongoose.connection.readyState !== 1) return;
+  if (!webPush || mongoose.connection.readyState !== 1) return false;
+  let delivered=false;
   try {
     const subs = await PushSubscription.find({ userId });
     for (const sub of subs) {
@@ -846,6 +909,7 @@ async function sendPushToUser(userId, payload) {
         const endpoint = new URL(sub.endpoint);
         if (endpoint.protocol !== 'https:' || !/(^|\.)(fcm.googleapis.com|push.services.mozilla.com|push.apple.com|notify.windows.com)$/.test(endpoint.hostname)) continue;
         await webPush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload));
+        delivered=true;
       } catch (err) {
         if (err.statusCode === 410 || err.statusCode === 404) {
           await PushSubscription.deleteOne({ _id: sub._id });
@@ -853,6 +917,7 @@ async function sendPushToUser(userId, payload) {
       }
     }
   } catch {}
+  return delivered;
 }
 
 // ─────────────────────────────────────────────
@@ -917,7 +982,7 @@ const SUGGESTION_LIST = [
 
 app.get('/api/suggestions', (req, res) => {
   const { q } = req.query;
-  if (!q || q.length < 2) return res.json({ suggestions: [] });
+  if (typeof q !== 'string' || q.length < 2 || q.length > 120) return res.json({ suggestions: [] });
   const ql = q.toLowerCase();
   const matches = SUGGESTION_LIST.filter(s => s.toLowerCase().includes(ql)).slice(0, 7);
   res.json({ suggestions: matches });
@@ -927,7 +992,7 @@ app.get('/api/suggestions', (req, res) => {
 // ── UPDATE PROFILE
 app.post('/auth/update-profile', authMiddleware, async (req, res) => {
   const { firstName, lastName } = req.body;
-  if (typeof firstName !== 'string' || typeof lastName !== 'string' || firstName.length > 60 || lastName.length > 60 || /[<>]/.test(firstName + lastName))
+  if (!security.cleanName(firstName) || !security.cleanName(lastName))
     return res.status(400).json({ message: 'Enter a valid first and last name.' });
   if (!firstName || !lastName) return res.status(400).json({ message: 'Name fields required' });
   try {
@@ -939,7 +1004,7 @@ app.post('/auth/update-profile', authMiddleware, async (req, res) => {
 // ── CHANGE PASSWORD
 app.post('/auth/change-password', authMiddleware, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || newPassword.length > 128)
+  if (typeof currentPassword !== 'string' || Buffer.byteLength(currentPassword,'utf8')>72 || !security.validPassword(newPassword))
     return res.status(400).json({ message: 'Enter valid passwords.' });
   if (!currentPassword || !newPassword) return res.status(400).json({ message: 'All fields required' });
   if (newPassword.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters' });
@@ -949,7 +1014,11 @@ app.post('/auth/change-password', authMiddleware, async (req, res) => {
     const match = user.password && await bcrypt.compare(currentPassword, user.password);
     if (!match) return res.status(401).json({ message: 'Current password is incorrect' });
     user.password = await bcrypt.hash(newPassword, 12);
+    user.sessions = [];
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
     await user.save();
+    sessions.clear(res);
     res.json({ success: true });
   } catch { res.status(500).json({ message: 'Server error' }); }
 });
@@ -959,7 +1028,8 @@ app.use((req, res) => {
   res.status(404).sendFile(path.join(__dirname, '..', '404.html'));
 });
 app.use((err, req, res, next) => {
-  res.status(err.status === 400 ? 400 : 500).json({ message: err.status === 400 ? 'Invalid request body.' : 'The request could not be completed.' });
+  const code=err.status===413?413:err.status===400?400:500;
+  res.status(code).json({ message: code===413?'Request body is too large.':code===400?'Invalid request body.':'The request could not be completed.' });
 });
 
 app.listen(PORT, '0.0.0.0', () => {

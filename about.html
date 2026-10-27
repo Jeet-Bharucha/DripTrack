@@ -9,6 +9,8 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23243d32'/%3E%3Ctext x='10' y='44' font-size='36' font-family='Arial' font-weight='bold' fill='%23d9f474'%3Edt%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/site.css">
 <link rel="manifest" href="/manifest.json">
+<script defer src="/shop-utils.js">
+</script>
 <script defer src="/site.js">
 </script>
 </head>
@@ -43,9 +45,9 @@
 <h2>History without guesswork</h2>
 <p>We record a price observation when an uncached search returns that exact source listing. History is keyed to the listing, not a mixture of search results. We never generate estimated charts, fake movements or backfilled prices. Early listings may have just one observation.</p>
 <h2>Alerts and availability</h2>
-<p>Price alerts check the exact saved listing when this server is running, approximately every 30 minutes. A match is required before an alert can trigger. Checks can be delayed by provider outages, credit limits or hosting sleep. Email delivery is not guaranteed. Existing alerts without a listing ID need to be recreated from a current result.</p>
+<p>Price alerts check the exact saved listing when this server is running, approximately every 30 minutes. A match is required before an alert can trigger. Checks can be delayed by provider outages, credit limits or hosting sleep. Verify your email before enabling alerts. Alerts rearm after an observed price rises above the target. You can edit or pause them from your account. Email delivery is not guaranteed. Existing alerts without a listing ID need to be recreated from a current result.</p>
 <h2 id="privacy">Your account and data</h2>
-<p>Accounts store your name, email, password hash, saved listings and alert preferences in our database. Google sign-in also stores your Google account ID and optional avatar. Passwords are hashed. Your sign-in token is kept in your browser so you remain signed in; sign out on shared devices.</p>
+<p>Accounts store your name, email, password hash, saved listings and alert preferences in our database. Google sign-in also stores your Google account ID and optional avatar. Comparison selections and recent searches are held in session storage for this browser tab. Passwords are hashed. Sign-in uses an HttpOnly cookie that page scripts cannot read. Sessions can be revoked from your account; sign out on shared devices.</p>
 <p>Search terms are sent to the listing providers named above. Product images load from their original hosts. The site uses Google Fonts. Following an external listing takes you to a third party with its own privacy and purchase terms.</p>
 <p>You can remove saved listings and alerts, or delete your account from the account page. Deleting your account removes its profile, saved listings, alerts and push subscriptions; previously collected listing observations do not identify your account.</p>
 <h2>Questions or problems?</h2>
@@ -76,6 +78,22 @@
 </div>
 </div>
 </footer>
+<aside id="compare-dock" class="compare-dock" aria-label="Selected listings" hidden>
+<span id="compare-count">
+</span>
+<button id="open-compare" class="button lime">Compare listings</button>
+<button id="clear-compare" class="button ghost">Clear</button>
+</aside>
+<dialog id="compare-dialog" aria-labelledby="compare-title">
+<div class="section-head">
+<h2 id="compare-title">Compare your shortlist</h2>
+<button class="button ghost" id="close-compare">Close ×</button>
+</div>
+<p class="fine">These are individual listings. Compare size, condition, seller and delivery details before deciding.</p>
+<p class="fine mobile-table-hint">Swipe across the table to see all selected listings.</p>
+<div id="comparison-table" class="table-wrap" tabindex="0" role="region" aria-label="Listing comparison table">
+</div>
+</dialog>
 <div id="toast" class="toast" role="status" hidden>
 </div>
 </body>

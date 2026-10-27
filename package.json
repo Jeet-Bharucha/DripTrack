@@ -4,11 +4,11 @@
   "description": "DRIPTRACK — Real prices. Real products.",
   "scripts": {
     "build": "node build-pages.js",
-    "test": "node --test backend/catalog.test.js backend/pricing.test.js backend/routes.test.js",
+    "test": "node --test backend/catalog.test.js backend/pricing.test.js backend/security.test.js backend/shop-utils.test.js backend/routes.test.js",
     "start": "node backend/server.js",
     "postinstall": "cd backend && npm install"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.22.1 <25"
   }
 }

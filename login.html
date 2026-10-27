@@ -9,6 +9,8 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23243d32'/%3E%3Ctext x='10' y='44' font-size='36' font-family='Arial' font-weight='bold' fill='%23d9f474'%3Edt%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/site.css">
 <link rel="manifest" href="/manifest.json">
+<script defer src="/shop-utils.js">
+</script>
 <script defer src="/site.js">
 </script>
 </head>
@@ -74,6 +76,22 @@
 </div>
 </div>
 </footer>
+<aside id="compare-dock" class="compare-dock" aria-label="Selected listings" hidden>
+<span id="compare-count">
+</span>
+<button id="open-compare" class="button lime">Compare listings</button>
+<button id="clear-compare" class="button ghost">Clear</button>
+</aside>
+<dialog id="compare-dialog" aria-labelledby="compare-title">
+<div class="section-head">
+<h2 id="compare-title">Compare your shortlist</h2>
+<button class="button ghost" id="close-compare">Close ×</button>
+</div>
+<p class="fine">These are individual listings. Compare size, condition, seller and delivery details before deciding.</p>
+<p class="fine mobile-table-hint">Swipe across the table to see all selected listings.</p>
+<div id="comparison-table" class="table-wrap" tabindex="0" role="region" aria-label="Listing comparison table">
+</div>
+</dialog>
 <div id="toast" class="toast" role="status" hidden>
 </div>
 </body>

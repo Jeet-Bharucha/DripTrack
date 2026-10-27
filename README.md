@@ -6,9 +6,13 @@ Product listing discovery for sneakers, watches, bags and accessories. The UI sh
 
 ## Run locally
 
-Use Node.js 20 or newer. Install backend dependencies with `npm install --prefix backend`, copy `.env.example` to `backend/.env`, supply your own settings, then run `npm start`. Open http://localhost:3001.
+Use Node.js 24.22.1 (pinned in .node-version). Install backend dependencies with `npm install --prefix backend`, copy `.env.example` to `backend/.env`, supply your own settings, then run `npm start`. Open http://localhost:3001.
 
-`npm run build` regenerates the HTML pages from `build-pages.js`. Shared layout and behavior live in `site.css` and `site.js`.
+`npm run build` regenerates the HTML pages from `build-pages.js`. Shared layout and behavior live in site.css, site.js and shop-utils.js.
+
+## Shopping features
+
+Filter by retailer, condition and price; sort and share searches; compare up to three individual listings; save exact listings, refresh saved snapshots and export CSV safely. Signed-in users can pause, resume or edit exact-listing alerts. Verification emails can be resent from the account page. Recent searches and comparison selections live only in the current tab.
 
 ## Data providers
 
@@ -24,7 +28,7 @@ History observations use stable listing IDs and are recorded only after fresh se
 
 ## Accounts
 
-Email/password and configured Google OAuth sign-in are supported. Saved listings and alerts are held in MongoDB. The site checks source data again when saving a listing or alert. Passwords are hashed, OAuth uses a state cookie, and the OAuth return token is passed in a URL fragment rather than the query string. Account deletion removes the profile and push subscriptions.
+Email/password and configured Google OAuth sign-in are supported. Saved listings and alerts are held in MongoDB. The site checks source data again when saving a listing or alert. Passwords are hashed. Sign-in uses an opaque, revocable HttpOnly cookie (Secure and __Host- prefixed in production). Only session hashes are stored in MongoDB. Mutations require a session-bound CSRF token and same-origin request headers. OAuth uses a state cookie and redirects without a token in the URL. Sign out all devices and password changes revoke existing sessions. Account deletion removes the profile and push subscriptions.
 
 ## Configuration
 
@@ -34,7 +38,9 @@ Set `PUBLIC_URL` to the deployed HTTPS origin when needed. The application autom
 
 ## Checks
 
-Run `npm test`. Tests cover source filtering, unsafe URLs, source provenance, provider failures, request deduplication and cache timestamps. Route tests use an isolated in-memory model and real password hashing/JWT middleware to check registration, login, watchlist deduplication, exact-listing alerts, profile updates and account deletion. They do not write to production or send email.
+Run `npm test`. Tests cover source filtering, unsafe URLs, source provenance, provider failures, request deduplication and cache timestamps. Route tests use an isolated in-memory model and real password hashing and session middleware to check registration, login, watchlist deduplication, exact-listing alerts, profile updates and account deletion. They do not write to production or send email.
+
+Security verification details and known limits are documented in SECURITY-REVIEW.md. GitHub Actions checks builds, tests and dependency advisories on Windows and Linux.
 
 ## Hosting
 
