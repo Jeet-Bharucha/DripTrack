@@ -233,3 +233,26 @@
   }
   if(page==='about')status();
 })();
+
+// Reveal editorial sections once; content remains visible without scripting or motion.
+(() => {
+  const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  if (motion.matches || !('IntersectionObserver' in window)) return;
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.replace('reveal-pending', 'reveal-ready');
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.principles, .section-head, .method-banner').forEach(section => {
+    if (section.getBoundingClientRect().top < innerHeight) return;
+    section.classList.add('reveal-pending');
+    observer.observe(section);
+  });
+  motion.addEventListener('change', event => {
+    if (!event.matches) return;
+    observer.disconnect();
+    document.querySelectorAll('.reveal-pending').forEach(section => section.classList.remove('reveal-pending'));
+  });
+})();
