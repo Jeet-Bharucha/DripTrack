@@ -8,6 +8,7 @@ const nodemailer = require('nodemailer');
 const pricing = require('./pricing');
 const security = require('./security');
 const {evaluateAlert} = require('./alerts');
+const {assetVersion}=require('./assets');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -70,6 +71,8 @@ app.use((req, res, next) => {
   let file;
   try { file = decodeURIComponent(req.path).slice(1); } catch { return res.sendStatus(400); }
   if (!publicFiles.has(file)) return next();
+  if (['site.css','site.js','shop-utils.js'].includes(file) && req.query.v===assetVersion) res.set('Cache-Control','public, max-age=31536000, immutable');
+  else res.set('Cache-Control','no-cache');
   res.sendFile(path.join(__dirname, '..', file));
 });
 
@@ -666,8 +669,9 @@ app.get('/api/prices', async (req, res) => {
   try {
     const data = await pricing.search(q);
     // Store observations for the exact source listing, never a blended search-query minimum.
-    if (!data.cached) await Promise.all(data.results.map(r => savePriceHistory(`listing-v2-${r.id}`, r.price, r.source)));
     res.json(data);
+    // History persistence must never delay a response from a working provider.
+    if (!data.cached) void Promise.allSettled(data.results.map(r => savePriceHistory(`listing-v2-${r.id}`, r.price, r.source)));
   } catch { res.status(503).json({ message: 'Price search is temporarily unavailable. Please try again.' }); }
 });
 app.get('/api/history', async (req, res) => {

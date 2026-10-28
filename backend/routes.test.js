@@ -145,3 +145,13 @@ test('concurrent sign-ins retain separate revocable sessions',()=>run(async h=>{
   const captured=a.cookie;await a.call('/auth/logout','POST',{});a.cookie=captured;
   assert.equal((await a.call('/auth/me')).status,401);assert.equal((await b.call('/auth/me')).status,200);
 }));
+test('product responses do not wait for stalled database history writes',()=>run(async h=>{
+  const response=await h.client().call('/api/prices?q=Nike%20Dunk%20Low%20Panda','GET',undefined,{signal:AbortSignal.timeout(1000)});
+  assert.equal(response.status,200);assert.ok(response.data.results.length);
+},{slowHistory:true}));
+test('versioned public assets are cached while HTML and unversioned files revalidate',()=>run(async h=>{
+  const c=h.client(),{assetVersion}=require('./assets');
+  const asset=await c.call('/site.css?v='+assetVersion);assert.equal(asset.status,200);assert.ok(asset.headers.get('cache-control').includes('immutable'));assert.ok(!asset.text.includes('@import'));
+  const page=await c.call('/');assert.ok(page.text.includes('/site.js?v='+assetVersion));assert.ok(!page.headers.get('cache-control').includes('immutable'));
+  const plain=await c.call('/site.js');assert.equal(plain.headers.get('cache-control'),'no-cache');
+}));

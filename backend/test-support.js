@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),http=require('http'),express=require('express'),mongoose=require('mongoose'),path=require('path');
-async function harness({database=true,port=0,origin='https://driptrack.test'}={}){
+async function harness({database=true,port=0,origin='https://driptrack.test',slowHistory=false}={}){
   const stores=new Map(),mail=[];
   const listing={id:'a'.repeat(24),title:'Nike Dunk Low Panda',price:99,currency:'USD',source:'Test fixture',provider:'Test fixture',url:'https://example.com/product/1',image:null,fetchedAt:new Date().toISOString()};
   const listings=[listing,{...listing,id:'c'.repeat(24),title:'Nike Dunk Low Panda size 10',source:'Second test fixture',price:120,condition:'New with box'}];
@@ -29,7 +29,7 @@ async function harness({database=true,port=0,origin='https://driptrack.test'}={}
       static async findByIdAndDelete(id){const i=rows.findIndex(r=>String(r._id)===String(id));if(i>=0)rows.splice(i,1);}
       static async deleteMany(filter){for(let i=rows.length-1;i>=0;i--)if(matches(rows[i],filter||{}))rows.splice(i,1);}
       static async deleteOne(filter){const index=rows.findIndex(r=>matches(r,filter));if(index>=0)rows.splice(index,1);}
-      static async create(data){return new this(data).save();}
+      static async create(data){if(name==='PriceHistory'&&slowHistory)return new Promise(()=>{});return new this(data).save();}
       static async countDocuments(){return rows.length;}
     }
     stores.set(name,{Model,rows});return Model;
@@ -40,7 +40,7 @@ async function harness({database=true,port=0,origin='https://driptrack.test'}={}
     if(name==='mongoose')return {Schema:mongoose.Schema,model,connection:{readyState:database?1:0},connect:async()=>{}};
     if(name==='dotenv')return {config:()=>{}};
     if(name==='nodemailer')return {createTransport:()=>({verify:cb=>cb(null),sendMail:async data=>{mail.push(data);return {accepted:[data.to]};}})};
-    if(name==='./pricing')return {search:async()=>({results:listings,cached:true,providers:[],totalSources:2,fetchedAt:listing.fetchedAt}),listing:async(q,id)=>listings.find(i=>i.id===id)||null,providerStatus:()=>[]};
+    if(name==='./pricing')return {search:async()=>({results:listings,cached:!slowHistory,providers:[],totalSources:2,fetchedAt:listing.fetchedAt}),listing:async(q,id)=>listings.find(i=>i.id===id)||null,providerStatus:()=>[]};
     return require(name);
   },process:{env:{JWT_SECRET:'isolated-route-test-secret-32-chars-minimum',PORT:String(port),GMAIL_USER:'test@example.invalid',GMAIL_PASS:'test-only',PUBLIC_URL:origin,GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'test'},exit:()=>{}},__dirname,console:{log:()=>{},error:()=>{},warn:()=>{}},setTimeout:()=>0,setInterval:()=>0,URLSearchParams,URL,Buffer};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'server.js'),'utf8'),context);
@@ -48,7 +48,7 @@ async function harness({database=true,port=0,origin='https://driptrack.test'}={}
   function client(){let cookie='',csrf='';return {
     get cookie(){return cookie;},set cookie(value){cookie=value;},get csrf(){return csrf;},set csrf(value){csrf=value;},
     async call(route,method='GET',body,extra={}){
-      const response=await fetch(root+route,{method,redirect:'manual',headers:{'Content-Type':'application/json','X-DripTrack-Request':'1',...(cookie?{Cookie:cookie}:{}),...(csrf?{'X-CSRF-Token':csrf}:{}),...extra.headers},body:extra.raw!==undefined?extra.raw:body!==undefined?JSON.stringify(body):undefined});
+      const response=await fetch(root+route,{method,redirect:'manual',signal:extra.signal||AbortSignal.timeout(10000),headers:{'Content-Type':'application/json','X-DripTrack-Request':'1',...(cookie?{Cookie:cookie}:{}),...(csrf?{'X-CSRF-Token':csrf}:{}),...extra.headers},body:extra.raw!==undefined?extra.raw:body!==undefined?JSON.stringify(body):undefined});
       const text=await response.text();let data;try{data=JSON.parse(text);}catch{data=text;}
       const set=response.headers.get('set-cookie');if(set&&/^(?:__Host-)?driptrack_session=/.test(set))cookie=set.split(';')[0];
       if(data?.csrfToken)csrf=data.csrfToken;

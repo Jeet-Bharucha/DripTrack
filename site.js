@@ -2,6 +2,12 @@
 (() => {
   const $ = selector => document.querySelector(selector);
   const page = document.body.dataset.page;
+  // Render immediately with system fonts; fetch brand fonts after the first paint.
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const fonts=document.createElement('link');fonts.rel='stylesheet';
+    fonts.href='https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap';
+    document.head.append(fonts);
+  }));
   const params = new URLSearchParams(location.search);
   let authenticated=false,csrfToken='';
   try{localStorage.removeItem('driptrack_token');localStorage.removeItem('driptrack_user');}catch{}
